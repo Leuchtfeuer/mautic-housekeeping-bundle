@@ -8,7 +8,7 @@ Befehl zum Löschen von EventLog Tabellen Einträgen.
 ```
 bin/console mautic:housekeeping:cleanup
 ```
-Es werden standardmäßig Einträge aus der CampaignLeadEventLog und der LeadEventLog Tabelle gelöscht, die älter als 365 sind.
+Es werden standardmäßig Einträge aus der CampaignLeadEventLog und der LeadEventLog Tabelle gelöscht, die älter als 365 Tage sind.
 ### Parameter
 ```
 -d  | --days-old      | Gibt das mindest Alter der zu löschenden Einträge an. Default: 365 Tage
