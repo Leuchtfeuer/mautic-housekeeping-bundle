@@ -1,9 +1,9 @@
 # Mautic Housekeeping Bundle
-Dieses Bundle stellt einen Mautic Houseekping Command  zum säubern der Datenbank zur Verfügung
+Dieses Bundle stellt einen Mautic Houseekping Command  zum Säubern der Datenbank zur Verfügung
 
 ## Command
 
-Befehl zum Löschen von EventLog Tabellen Einträgen. 
+Befehl zum Löschen von EventLog Tabelleneinträgen. 
 
 ```
 bin/console mautic:eventlog:delete
