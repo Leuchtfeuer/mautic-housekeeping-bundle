@@ -37,18 +37,24 @@ class EventLogCleanupCommand extends ContainerAwareCommand
             )
             ->setHelp(
                 <<<'EOT'
-                The <info>%command.name%</info> command is used to clean up the CampaignLeadEventLog table.
+                The <info>%command.name%</info> command is used to clean up the CampaignLeadEventLog and LeadEventLog table.
 
                 <info>php %command.full_name%</info>
                 
-                Specify the number of days old data should be before purging.
-                
+                Specify the number of days old data should be before purging:
                 <info>php %command.full_name% --days-old=365</info>
                 
                 You can also optionally specify a dry run without deleting any records:
-                
                 <info>php %command.full_name% --days-old=365 --dry-run</info>
-
+                
+                You can also otionally specify for which campaign  the entries should be purged:
+                <info>php %command.full_name% --cmp-id=123</info> 
+                
+                Purge only Campaign Lead Event Log Records:
+                <info>php %command.full_name% --campaign-lead </info> 
+                
+                Purge only Lead Event Log Records
+                <info>php %command.full_name% --lead</info> 
                 EOT
             );
     }
@@ -115,7 +121,7 @@ class EventLogCleanupCommand extends ContainerAwareCommand
         ];
 
 
-        if ($dryRun) { //Only Select in Dry-Run --> Return Number of Selected Rows
+        if ($dryRun) { //Only Select-Query in Dry-Run --> Return Number of Selected Rows
 
 
             if ($cmpId === 'none') {

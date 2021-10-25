@@ -6,7 +6,7 @@ Dieses Bundle stellt einen Mautic Houseekping Command  zum säubern der Datenban
 Befehl zum Löschen von EventLog Tabellen Einträgen. 
 
 ```
-bin/console mautic:housekeeping:cleanup
+bin/console mautic:eventlog:delete
 ```
 Es werden standardmäßig Einträge aus der CampaignLeadEventLog und der LeadEventLog Tabelle gelöscht, die älter als 365 Tage sind.
 ### Parameter
@@ -18,5 +18,9 @@ Es werden standardmäßig Einträge aus der CampaignLeadEventLog und der LeadEve
 -l  | --lead          | Es werden nur Einträge aus der LeadEventLog Tabelle gelöscht.
 ```
 
+
+### Installation
+- Inhalte müssen unter plugins/MauticHouskeepingBundle/ abgespeichert werden.   
+- Danach sollte einmal der Cache geleert werden.
 
 
