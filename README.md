@@ -1,13 +1,13 @@
-#Mautic Housekeeping Bundle
+# Mautic Housekeeping Bundle
 Dieses Bundle stellt einen Mautic Houseekping Command  zum säubern der Datenbank zur Verfügung
 
-##Command
+## Command
 
 Befehl zum Löschen von CampaignLeadEventLog Tabellen Einträgen
 ```
 bin/console mautic:housekeeping:cleanup
 ```
-###Parameter
+### Parameter
 ```
 -d  | --days-old   | Gibt das mindest Alter der zu löschenden Einträge an. Default: 365 Tage
 -r  | --dry-run    | Durchführung als Dry Run. Es werden keine Einträge gelöscht.
