@@ -1,26 +1,39 @@
 # Mautic Housekeeping Bundle
-Dieses Bundle stellt einen Mautic Houseekping Command  zum Säubern der Datenbank zur Verfügung
+This bundle provides a Mautic Houseekping Command for database cleanup purposes.
 
 ## Command
 
-Befehl zum Löschen von EventLog Tabelleneinträgen. 
+Command to delete EventLog table entries. 
 
 ```
 bin/console mautic:eventlog:delete
 ```
-Es werden standardmäßig Einträge aus der CampaignLeadEventLog und der LeadEventLog Tabelle gelöscht, die älter als 365 Tage sind.
+By default, entries older than 365 days are deleted from the CampaignLeadEventLog and LeadEventLog tables.
 ### Parameter
 ```
--d  | --days-old      | Gibt das mindest Alter der zu löschenden Einträge an. Default: 365 Tage
--r  | --dry-run       | Durchführung als Dry Run. Es werden keine Einträge gelöscht.
--i  | --cmp-id        | Nur Daten zu einer spezifischen Kampagnen Id löschen
--c  | --campaign-lead | Es werden nur Einträge aus der CampaignLeadEventLog Tabelle gelöscht.
--l  | --lead          | Es werden nur Einträge aus der LeadEventLog Tabelle gelöscht.
+-d  | --days-old      | Specifies the minimum age of the entries to be deleted. Default: 365 days
+-r  | --dry-run       | Execute as dry run. No entries will be deleted
+-i  | --cmp-id        | Delete only data for a specific campaign ID
+-c  | --campaign-lead | Only entries from the CampaignLeadEventLog table will be deleted
+-l  | --lead          | Only entries from the LeadEventLog table will be deleted.
 ```
 
 
 ### Installation
-- Inhalte müssen unter plugins/MauticHouskeepingBundle/ abgespeichert werden.   
-- Danach sollte einmal der Cache geleert werden.
+- Contents must be saved under plugins/MauticHouskeepingBundle/  as follows: 
+```
+PAGE_NAME/htdocs/plugins/MauticHousekeepingBundle/
+- - - Command/
+- - - - - EventLogCleanupCommand.php
+- - - Config/
+- - - - - config.php
+- - - MauticHousekeepingBundle.php
+```
+
+- Afterwards, the cache should be cleared once.  The easiest way is to go to the /var/cache folder and delete its content. 
+  Navigate to the Mautic root folder and run: 
+```
+rm -rf var/cache/*
+```
 
 
