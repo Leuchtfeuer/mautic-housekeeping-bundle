@@ -20,20 +20,8 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 
 
 ### Installation
-- Contents must be saved under plugins/MauticHouskeepingBundle/  as follows: 
-```
-PAGE_NAME/htdocs/plugins/MauticHousekeepingBundle/
-- - - Command/
-- - - - - EventLogCleanupCommand.php
-- - - Config/
-- - - - - config.php
-- - - MauticHousekeepingBundle.php
-```
+- Plugin must be saved under plugins/MauticHouskeepingBundle/ 
 
-- Afterwards, the cache should be cleared once.  The easiest way is to go to the /var/cache folder and delete its content. 
-  Navigate to the Mautic root folder and run: 
-```
-rm -rf var/cache/*
-```
+- Afterwards, the cache must be cleared.  
 
 
