@@ -1,0 +1,18 @@
+{
+    "name": "leuchtfeuer/mautic-housekeeping-bundle",
+    "type": "mautic-plugin",
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.5"
+    },
+    "license": "GPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Max Rösch",
+            "email": "github@elbebass.com"
+        }
+    ],
+    "require": {},
+    "scripts": {
+        "cs-fix": "./vendor/bin/php-cs-fixer fix --config .php-cs-fixer.php --using-cache no --show-progress dots -v"
+    }
+}

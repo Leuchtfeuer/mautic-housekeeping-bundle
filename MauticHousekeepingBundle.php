@@ -9,5 +9,4 @@ use Mautic\PluginBundle\Bundle\PluginBundleBase;
  */
 class MauticHousekeepingBundle extends PluginBundleBase
 {
-
 }
