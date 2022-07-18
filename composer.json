@@ -1,9 +1,6 @@
 {
     "name": "leuchtfeuer/mautic-housekeeping-bundle",
     "type": "mautic-plugin",
-    "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.5"
-    },
     "license": "GPL-3.0-or-later",
     "authors": [
         {
@@ -11,8 +8,40 @@
             "email": "github@elbebass.com"
         }
     ],
-    "require": {},
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^7.4",
+        "ext-pdo": "*",
+        "mautic/core-lib": "^3.0|^4.0"
+    },
+    "extra": {
+        "install-directory-name": "MauticHousekeepingBundle"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "MauticPlugin\\MauticHousekeepingBundle\\": ""
+        }
+    },
+    "repositories": [
+        {
+            "type": "git",
+            "url": "https://github.com/dennisameling/FOSOAuthServerBundle.git"
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/mautic/BazingaOAuthServerBundle.git"
+        }
+    ],
     "scripts": {
         "cs-fix": "./vendor/bin/php-cs-fixer fix --config .php-cs-fixer.php --using-cache no --show-progress dots -v"
+    },
+    "config": {
+        "allow-plugins": {
+            "symfony/flex": true
+        }
     }
 }

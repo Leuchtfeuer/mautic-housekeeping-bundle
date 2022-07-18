@@ -6,7 +6,7 @@ This bundle provides a Mautic Houseekping Command for database cleanup purposes.
 Command to delete EventLog table entries. 
 
 ```
-bin/console mautic:eventlog:delete
+bin/console mautic:leuchtfeuer:housekeeping
 ```
 By default, entries older than 365 days are deleted from the CampaignLeadEventLog and LeadEventLog tables.
 ### Parameter
