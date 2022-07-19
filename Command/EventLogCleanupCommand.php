@@ -13,9 +13,27 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class EventLogCleanupCommand extends Command
 {
+    protected static $defaultName = 'mautic:leuchtfeuer:housekeeping';
+
     public const DEFAULT_DAYS = 365;
 
     private ManagerRegistry $doctrine;
+
+    private const CAMPAIGN_LEAD_EVENTS = 'campaign_lead_event_log';
+    private const LEAD_EVENTS          = 'lead_event_log';
+    private const EMAIL_STATS          = 'email_stats';
+
+    /**
+     * @var array<string, string>
+     */
+    private array $queries = [
+        self::CAMPAIGN_LEAD_EVENTS => 'campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+        self::LEAD_EVENTS          => 'lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+        self::EMAIL_STATS          => 'email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+    ];
+
+    private string $dryRunMessage = ' rows would have been deleted. This is a dry run.';
+    private string $runMessage    = ' rows have been deleted.';
 
     public function __construct(ManagerRegistry $doctrine)
     {
@@ -26,7 +44,7 @@ class EventLogCleanupCommand extends Command
 
     protected function configure(): void
     {
-        $this->setName('mautic:leuchtfeuer:housekeeping')
+        $this->setName(self::$defaultName)
             ->setDescription('EventLog Cleanup Command')
             ->setDefinition(
                 [
@@ -75,216 +93,99 @@ class EventLogCleanupCommand extends Command
     {
         $daysOld                              = (int) $input->getOption('days-old');
         $dryRun                               = $input->getOption('dry-run');
-        $onlyCampaignLeadEventLogRecords      = $input->getOption('campaign-lead');
-        $onlyLeadEventRecords                 = $input->getOption('lead');
-        $onlyEmailStatsRecords                = $input->getOption('email-stats');
         $campaignId                           = 'none' === $input->getOption('cmp-id') ? null : (int) $input->getOption('cmp-id');
+        $operations                           = [
+            self::CAMPAIGN_LEAD_EVENTS => $input->getOption('campaign-lead'),
+            self::LEAD_EVENTS          => $input->getOption('lead'),
+            self::EMAIL_STATS          => $input->getOption('email-stats'),
+        ];
+
+        if (0 === array_sum($operations)) {
+            $operations = array_combine(array_keys($operations), array_fill(0, count($operations), true));
+        }
 
         try {
-            $deletedRows = $this->deleteCmpLeadEventLogEntries($daysOld, $campaignId, $dryRun, $onlyCampaignLeadEventLogRecords, $onlyLeadEventRecords, $onlyEmailStatsRecords);
+            $deletedRows = $this->deleteCmpLeadEventLogEntries($daysOld, $campaignId, $dryRun, $operations);
         } catch (Exception $e) {
-            $output->writeln(sprintf('<error>Deletion of CampaignLeadEventLog Rows failed because of database error: %s</error>', $e->getMessage()));
+            $output->writeln(sprintf('<error>Deletion of Log Rows failed because of database error: %s</error>', $e->getMessage()));
 
             return 1;
         }
 
-        if ($dryRun) {
-            if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords && !$onlyEmailStatsRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords && $onlyEmailStatsRecords)) {
-                $output->writeln(sprintf('<info>%s CampaignLeadEventLog, %s EmailStats Rows and %s LeadEventLog Rows would have been deleted. This is a dry run.</info>', $deletedRows['campaignLeadEventsCount'], $deletedRows['leadEventsCount'], $deletedRows['emailStatsCount']));
-            } elseif ($onlyCampaignLeadEventLogRecords) {
-                $output->writeln(sprintf('<info>%s CampaignLeadEventLog Rows would have been deleted. This is a dry run.</info>', $deletedRows['campaignLeadEventsCount']));
-            } elseif ($onlyEmailStatsRecords) {
-                $output->writeln(sprintf('<info>%s EmailStats Rows would have been deleted. This is a dry run.</info>', $deletedRows['emailStatsCount']));
-            } else {
-                $output->writeln(sprintf('<info>%s LeadEventLog Rows would have been deleted. This is a dry run.</info>', $deletedRows['leadEventsCount']));
+        $message = '';
+        foreach ($operations as $operation => $enabled) {
+            if (false === $enabled) {
+                continue;
             }
-        } else {
-            if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords && !$onlyEmailStatsRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords && $onlyEmailStatsRecords)) {
-                $output->writeln(sprintf('<info>%s CampaignLeadEventLog and %s LeadEventLog Rows have been deleted.</info>', $deletedRows['campaignLeadEventsCount'], $deletedRows['leadEventsCount']));
-            } elseif ($onlyCampaignLeadEventLogRecords) {
-                $output->writeln(sprintf('<info>%s CampaignLeadEventLog Rows have been deleted.</info>', $deletedRows['campaignLeadEventsCount']));
-            } elseif ($onlyEmailStatsRecords) {
-                $output->writeln(sprintf('<info>%s EmailStats Rows have been deleted.</info>', $deletedRows['emailStatsCount']));
-            } else {
-                $output->writeln(sprintf('<info>%s LeadEventLog Rows have been deleted.</info>', $deletedRows['leadEventsCount']));
+
+            if ('' !== $message) {
+                if (self::EMAIL_STATS === $operation) {
+                    $message .= ' and ';
+                } else {
+                    $message .= ', ';
+                }
             }
+
+            $message .= $deletedRows[$operation].' '.$operation;
         }
+
+        $message .= $dryRun ? $this->dryRunMessage : $this->runMessage;
+        $output->writeln('<info>'.$message.'<info>');
 
         return 0;
     }
 
-    public function deleteCmpLeadEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, bool $onlyCampaignLeadEventLogRecords, bool $onlyLeadEventRecords, bool $onlyEmailStatsRecords): array
+    /**
+     * @param non-empty-array<string, bool> $operations
+     *
+     * @return non-empty-array<string, int>
+     */
+    public function deleteCmpLeadEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, array $operations): array
     {
         $prefix = MAUTIC_TABLE_PREFIX;
         $em     = $this->doctrine->getManager();
 
-        $leadEventsCount         = 0;
-        $campaignLeadEventsCount = 0;
-        $emailStatsCount         = 0;
-
         $params = [
-            ':daysOld' => (int) $daysOld,
-            ':cmpId'   => (int) $campaignId,
+            ':daysOld' => $daysOld,
         ];
         $types = [
             ':daysold' => \PDO::PARAM_INT,
-            ':cmpId'   => \PDO::PARAM_INT,
         ];
 
-        if ($dryRun) { //Only Select-Query in Dry-Run --> Return Number of Selected Rows
-            if (null === $campaignId) {
-                if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords && !$onlyEmailStatsRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords && $onlyEmailStatsRecords)) {
-                    $sql = <<<SQL
-                        SELECT * FROM {$prefix}campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $campaignLeadEventsCount = $stmt->rowCount();
-                    $sql = <<<SQL
-                        SELECT * FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $emailStatsCount         = $stmt->rowCount();
-                    $sql                     = <<<SQL
-                        SELECT * FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt            = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $leadEventsCount = $stmt->rowCount();
-                } elseif ($onlyCampaignLeadEventLogRecords) {
-                    $sql = <<<SQL
-                        SELECT * FROM {$prefix}campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $campaignLeadEventsCount = $stmt->rowCount();
-                } elseif ($onlyEmailStatsRecords) {
-                    $sql = <<<SQL
-                        SELECT * FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $emailStatsCount         = $stmt->rowCount();
-                } else {
-                    $sql = <<<SQL
-                        SELECT * FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt            = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $leadEventsCount = $stmt->rowCount();
+        if (null !== $campaignId && $operations[self::CAMPAIGN_LEAD_EVENTS]) {
+            $params[':cmpId'] = $campaignId;
+            $types[':cmpId']  = \PDO::PARAM_INT;
+            $this->queries[self::CAMPAIGN_LEAD_EVENTS] .= ' AND campaign_id = :cmpId';
+        }
+
+        $result = [
+            self::CAMPAIGN_LEAD_EVENTS => 0,
+            self::LEAD_EVENTS          => 0,
+            self::EMAIL_STATS          => 0,
+        ];
+
+        if ($dryRun) {
+            foreach ($operations as $operation => $enabled) {
+                if (false === $enabled) {
+                    continue;
                 }
-            } else {
-                if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords && !$onlyEmailStatsRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords && $onlyEmailStatsRecords)) {
-                    $sql = <<<SQL
-                        SELECT * FROM {$prefix}campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND campaign_id = :cmpId
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $campaignLeadEventsCount = $stmt->rowCount();
-                    $sql = <<<SQL
-                        SELECT * FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $emailStatsCount         = $stmt->rowCount();
-                    $sql                     = <<<SQL
-                        SELECT * FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt            = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $leadEventsCount = $stmt->rowCount();
-                } elseif ($onlyCampaignLeadEventLogRecords) {
-                    $sql = <<<SQL
-                        SELECT * FROM {$prefix}campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND campaign_id = :cmpId
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $campaignLeadEventsCount = $stmt->rowCount();
-                } elseif ($onlyEmailStatsRecords) {
-                    $sql = <<<SQL
-                        SELECT * FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $emailStatsCount         = $stmt->rowCount();
-                } else {
-                    $sql = <<<SQL
-                        SELECT * FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt            = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $leadEventsCount = $stmt->rowCount();
-                }
+
+                $sql                     = 'SELECT * FROM '.$prefix.' '.$this->queries[$operation];
+                $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
+                $result[$operation]      = $stmt->rowCount();
             }
-        } else { // Execute without dryrun
-            if (null === $campaignId) {
-                if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords && !$onlyEmailStatsRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords && $onlyEmailStatsRecords)) {
-                    $sql = <<<SQL
-                        DELETE FROM {$prefix}campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $campaignLeadEventsCount = $stmt->rowCount();
-                    $sql = <<<SQL
-                        DELETE FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $emailStatsCount         = $stmt->rowCount();
-                    $sql                     = <<<SQL
-                        DELETE FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt            = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $leadEventsCount = $stmt->rowCount();
-                } elseif ($onlyCampaignLeadEventLogRecords) {
-                    $sql = <<<SQL
-                        DELETE FROM {$prefix}campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $campaignLeadEventsCount = $stmt->rowCount();
-                } elseif ($onlyEmailStatsRecords) {
-                    $sql = <<<SQL
-                        DELETE FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $emailStatsCount         = $stmt->rowCount();
-                } else {
-                    $sql = <<<SQL
-                        DELETE FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt            = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $leadEventsCount = $stmt->rowCount();
+        } else {
+            foreach ($operations as $operation => $enabled) {
+                if (false === $enabled) {
+                    continue;
                 }
-            } else {
-                if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords && !$onlyEmailStatsRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords && $onlyEmailStatsRecords)) {
-                    $sql = <<<SQL
-                        DELETE FROM {$prefix}campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND campaign_id = :cmpId
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $campaignLeadEventsCount = $stmt->rowCount();
-                    $sql = <<<SQL
-                        DELETE FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $emailStatsCount         = $stmt->rowCount();
-                    $sql                     = <<<SQL
-                        DELETE FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt            = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $leadEventsCount = $stmt->rowCount();
-                } elseif ($onlyCampaignLeadEventLogRecords) {
-                    $sql = <<<SQL
-                        DELETE FROM {$prefix}campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND campaign_id = :cmpId
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $campaignLeadEventsCount = $stmt->rowCount();
-                } elseif ($onlyEmailStatsRecords) {
-                    $sql = <<<SQL
-                        DELETE FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $emailStatsCount         = $stmt->rowCount();
-                } else {
-                    $sql = <<<SQL
-                        DELETE FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
-                        SQL;
-                    $stmt            = $em->getConnection()->executeQuery($sql, $params, $types);
-                    $leadEventsCount = $stmt->rowCount();
-                }
+
+                $sql                     = 'DELETE FROM '.$prefix.' '.$this->queries[$operation];
+                $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
+                $result[$operation]      = $stmt->rowCount();
             }
         }
 
-        return [
-            'campaignLeadEventsCount' => $campaignLeadEventsCount,
-            'leadEventsCount'         => $leadEventsCount,
-            'emailStatsCount'         => $emailStatsCount,
-        ];
+        return $result;
     }
 }
