@@ -40,12 +40,13 @@ class EventLogCleanupCommand extends Command
                     new InputOption('dry-run', 'r', InputOption::VALUE_NONE, 'Do a dry run without actually deleting anything.'),
                     new InputOption('campaign-lead', 'c', InputOption::VALUE_NONE, 'Purge only Campaign Lead Event Log Records'),
                     new InputOption('lead', 'l', InputOption::VALUE_NONE, 'Purge only Lead Event Log Records'),
-                    new InputOption('cmp-id', 'i', InputOption::VALUE_OPTIONAL, 'Delete only Log Records for a specific CampaignID', 'none'),
+                    new InputOption('email-stats', 'm', InputOption::VALUE_NONE, 'Purge only Email Stats Records'),
+                    new InputOption('cmp-id', 'i', InputOption::VALUE_OPTIONAL, 'Delete only campaign_lead_eventLog for a specific CampaignID', 'none'),
                 ]
             )
             ->setHelp(
                 <<<'EOT'
-                The <info>%command.name%</info> command is used to clean up the CampaignLeadEventLog and LeadEventLog table.
+                The <info>%command.name%</info> command is used to clean up the campaign_lead_event_log, email_stats and lead_event_log table.
 
                 <info>php %command.full_name%</info>
                 
@@ -55,7 +56,7 @@ class EventLogCleanupCommand extends Command
                 You can also optionally specify a dry run without deleting any records:
                 <info>php %command.full_name% --days-old=365 --dry-run</info>
                 
-                You can also optionally specify for which campaign the entries should be purged:
+                You can also optionally specify for which campaign the entries should be purged from campaign_lead_event_log:
                 <info>php %command.full_name% --cmp-id=123</info> 
                 
                 Purge only Campaign Lead Event Log Records:
@@ -63,6 +64,9 @@ class EventLogCleanupCommand extends Command
                 
                 Purge only Lead Event Log Records
                 <info>php %command.full_name% --lead</info> 
+                
+                Purge only Email Stats Records:
+                <info>php %command.full_name% --email-stats </info> 
                 EOT
             );
     }
@@ -70,13 +74,14 @@ class EventLogCleanupCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $daysOld                              = (int) $input->getOption('days-old');
-        $dryRun                               = $input->hasOption('dry-run');
-        $onlyCampaignLeadEventLogRecords      = $input->hasOption('campaign-lead');
-        $onlyLeadEventRecords                 = $input->hasOption('lead');
+        $dryRun                               = $input->getOption('dry-run');
+        $onlyCampaignLeadEventLogRecords      = $input->getOption('campaign-lead');
+        $onlyLeadEventRecords                 = $input->getOption('lead');
+        $onlyEmailStatsRecords                = $input->getOption('email-stats');
         $campaignId                           = 'none' === $input->getOption('cmp-id') ? null : (int) $input->getOption('cmp-id');
 
         try {
-            $deletedRows = $this->deleteCmpLeadEventLogEntries($daysOld, $campaignId, $dryRun, $onlyCampaignLeadEventLogRecords, $onlyLeadEventRecords);
+            $deletedRows = $this->deleteCmpLeadEventLogEntries($daysOld, $campaignId, $dryRun, $onlyCampaignLeadEventLogRecords, $onlyLeadEventRecords, $onlyEmailStatsRecords);
         } catch (Exception $e) {
             $output->writeln(sprintf('<error>Deletion of CampaignLeadEventLog Rows failed because of database error: %s</error>', $e->getMessage()));
 
@@ -84,18 +89,22 @@ class EventLogCleanupCommand extends Command
         }
 
         if ($dryRun) {
-            if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords)) {
-                $output->writeln(sprintf('<info>%s CampaignLeadEventLog and %s LeadEventLog Rows would have been deleted. This is a dry run.</info>', $deletedRows['campaignLeadEventsCount'], $deletedRows['leadEventsCount']));
+            if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords && !$onlyEmailStatsRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords && $onlyEmailStatsRecords)) {
+                $output->writeln(sprintf('<info>%s CampaignLeadEventLog, %s EmailStats Rows and %s LeadEventLog Rows would have been deleted. This is a dry run.</info>', $deletedRows['campaignLeadEventsCount'], $deletedRows['leadEventsCount'], $deletedRows['emailStatsCount']));
             } elseif ($onlyCampaignLeadEventLogRecords) {
                 $output->writeln(sprintf('<info>%s CampaignLeadEventLog Rows would have been deleted. This is a dry run.</info>', $deletedRows['campaignLeadEventsCount']));
+            } elseif ($onlyEmailStatsRecords) {
+                $output->writeln(sprintf('<info>%s EmailStats Rows would have been deleted. This is a dry run.</info>', $deletedRows['emailStatsCount']));
             } else {
                 $output->writeln(sprintf('<info>%s LeadEventLog Rows would have been deleted. This is a dry run.</info>', $deletedRows['leadEventsCount']));
             }
         } else {
-            if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords)) {
+            if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords && !$onlyEmailStatsRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords && $onlyEmailStatsRecords)) {
                 $output->writeln(sprintf('<info>%s CampaignLeadEventLog and %s LeadEventLog Rows have been deleted.</info>', $deletedRows['campaignLeadEventsCount'], $deletedRows['leadEventsCount']));
             } elseif ($onlyCampaignLeadEventLogRecords) {
                 $output->writeln(sprintf('<info>%s CampaignLeadEventLog Rows have been deleted.</info>', $deletedRows['campaignLeadEventsCount']));
+            } elseif ($onlyEmailStatsRecords) {
+                $output->writeln(sprintf('<info>%s EmailStats Rows have been deleted.</info>', $deletedRows['emailStatsCount']));
             } else {
                 $output->writeln(sprintf('<info>%s LeadEventLog Rows have been deleted.</info>', $deletedRows['leadEventsCount']));
             }
@@ -104,13 +113,14 @@ class EventLogCleanupCommand extends Command
         return 0;
     }
 
-    public function deleteCmpLeadEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, bool $onlyCampaignLeadEventLogRecords, bool $onlyLeadEventRecords): array
+    public function deleteCmpLeadEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, bool $onlyCampaignLeadEventLogRecords, bool $onlyLeadEventRecords, bool $onlyEmailStatsRecords): array
     {
         $prefix = MAUTIC_TABLE_PREFIX;
         $em     = $this->doctrine->getManager();
 
         $leadEventsCount         = 0;
         $campaignLeadEventsCount = 0;
+        $emailStatsCount         = 0;
 
         $params = [
             ':daysOld' => (int) $daysOld,
@@ -123,12 +133,17 @@ class EventLogCleanupCommand extends Command
 
         if ($dryRun) { //Only Select-Query in Dry-Run --> Return Number of Selected Rows
             if (null === $campaignId) {
-                if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords)) {
+                if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords && !$onlyEmailStatsRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords && $onlyEmailStatsRecords)) {
                     $sql = <<<SQL
                         SELECT * FROM {$prefix}campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
                         SQL;
                     $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
                     $campaignLeadEventsCount = $stmt->rowCount();
+                    $sql = <<<SQL
+                        SELECT * FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
+                        SQL;
+                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
+                    $emailStatsCount         = $stmt->rowCount();
                     $sql                     = <<<SQL
                         SELECT * FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
                         SQL;
@@ -140,6 +155,12 @@ class EventLogCleanupCommand extends Command
                         SQL;
                     $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
                     $campaignLeadEventsCount = $stmt->rowCount();
+                } elseif ($onlyEmailStatsRecords) {
+                    $sql = <<<SQL
+                        SELECT * FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
+                        SQL;
+                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
+                    $emailStatsCount         = $stmt->rowCount();
                 } else {
                     $sql = <<<SQL
                         SELECT * FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
@@ -148,12 +169,17 @@ class EventLogCleanupCommand extends Command
                     $leadEventsCount = $stmt->rowCount();
                 }
             } else {
-                if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords)) {
+                if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords && !$onlyEmailStatsRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords && $onlyEmailStatsRecords)) {
                     $sql = <<<SQL
                         SELECT * FROM {$prefix}campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND campaign_id = :cmpId
                         SQL;
                     $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
                     $campaignLeadEventsCount = $stmt->rowCount();
+                    $sql = <<<SQL
+                        SELECT * FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
+                        SQL;
+                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
+                    $emailStatsCount         = $stmt->rowCount();
                     $sql                     = <<<SQL
                         SELECT * FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
                         SQL;
@@ -165,6 +191,12 @@ class EventLogCleanupCommand extends Command
                         SQL;
                     $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
                     $campaignLeadEventsCount = $stmt->rowCount();
+                } elseif ($onlyEmailStatsRecords) {
+                    $sql = <<<SQL
+                        SELECT * FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
+                        SQL;
+                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
+                    $emailStatsCount         = $stmt->rowCount();
                 } else {
                     $sql = <<<SQL
                         SELECT * FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
@@ -175,12 +207,17 @@ class EventLogCleanupCommand extends Command
             }
         } else { // Execute without dryrun
             if (null === $campaignId) {
-                if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords)) {
+                if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords && !$onlyEmailStatsRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords && $onlyEmailStatsRecords)) {
                     $sql = <<<SQL
                         DELETE FROM {$prefix}campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
                         SQL;
                     $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
                     $campaignLeadEventsCount = $stmt->rowCount();
+                    $sql = <<<SQL
+                        DELETE FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
+                        SQL;
+                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
+                    $emailStatsCount         = $stmt->rowCount();
                     $sql                     = <<<SQL
                         DELETE FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
                         SQL;
@@ -192,6 +229,12 @@ class EventLogCleanupCommand extends Command
                         SQL;
                     $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
                     $campaignLeadEventsCount = $stmt->rowCount();
+                } elseif ($onlyEmailStatsRecords) {
+                    $sql = <<<SQL
+                        DELETE FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
+                        SQL;
+                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
+                    $emailStatsCount         = $stmt->rowCount();
                 } else {
                     $sql = <<<SQL
                         DELETE FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
@@ -200,12 +243,17 @@ class EventLogCleanupCommand extends Command
                     $leadEventsCount = $stmt->rowCount();
                 }
             } else {
-                if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords)) {
+                if ((!$onlyCampaignLeadEventLogRecords && !$onlyLeadEventRecords && !$onlyEmailStatsRecords) || ($onlyCampaignLeadEventLogRecords && $onlyLeadEventRecords && $onlyEmailStatsRecords)) {
                     $sql = <<<SQL
                         DELETE FROM {$prefix}campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND campaign_id = :cmpId
                         SQL;
                     $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
                     $campaignLeadEventsCount = $stmt->rowCount();
+                    $sql = <<<SQL
+                        DELETE FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
+                        SQL;
+                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
+                    $emailStatsCount         = $stmt->rowCount();
                     $sql                     = <<<SQL
                         DELETE FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
                         SQL;
@@ -217,6 +265,12 @@ class EventLogCleanupCommand extends Command
                         SQL;
                     $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
                     $campaignLeadEventsCount = $stmt->rowCount();
+                } elseif ($onlyEmailStatsRecords) {
+                    $sql = <<<SQL
+                        DELETE FROM {$prefix}email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
+                        SQL;
+                    $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
+                    $emailStatsCount         = $stmt->rowCount();
                 } else {
                     $sql = <<<SQL
                         DELETE FROM {$prefix}lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) 
@@ -230,6 +284,7 @@ class EventLogCleanupCommand extends Command
         return [
             'campaignLeadEventsCount' => $campaignLeadEventsCount,
             'leadEventsCount'         => $leadEventsCount,
+            'emailStatsCount'         => $emailStatsCount,
         ];
     }
 }
