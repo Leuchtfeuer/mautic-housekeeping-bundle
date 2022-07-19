@@ -13,7 +13,8 @@
     "require": {
         "php": "^7.4",
         "ext-pdo": "*",
-        "mautic/core-lib": "^3.0|^4.0"
+        "mautic/core-lib": "^3.0|^4.0",
+        "phpunit/phpunit": "^9.5"
     },
     "extra": {
         "install-directory-name": "MauticHousekeepingBundle"
@@ -24,6 +25,11 @@
     "autoload": {
         "psr-4": {
             "MauticPlugin\\MauticHousekeepingBundle\\": ""
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MauticPlugin\\MauticHousekeepingBundle\\Tests\\": "Tests"
         }
     },
     "repositories": [

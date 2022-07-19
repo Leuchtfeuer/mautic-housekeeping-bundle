@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticHousekeepingBundle\Command;
 
-use Doctrine\Persistence\ManagerRegistry;
 use Exception;
+use MauticPlugin\MauticHousekeepingBundle\Service\EventLogCleanup;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -15,29 +15,13 @@ class EventLogCleanupCommand extends Command
 {
     protected static $defaultName = 'mautic:leuchtfeuer:housekeeping';
 
-    public const DEFAULT_DAYS = 365;
+    private const DEFAULT_DAYS = 365;
 
-    private ManagerRegistry $doctrine;
+    private EventLogCleanup $eventLogCleanup;
 
-    private const CAMPAIGN_LEAD_EVENTS = 'campaign_lead_event_log';
-    private const LEAD_EVENTS          = 'lead_event_log';
-    private const EMAIL_STATS          = 'email_stats';
-
-    /**
-     * @var array<string, string>
-     */
-    private array $queries = [
-        self::CAMPAIGN_LEAD_EVENTS => 'campaign_lead_event_log WHERE date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-        self::LEAD_EVENTS          => 'lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-        self::EMAIL_STATS          => 'email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-    ];
-
-    private string $dryRunMessage = ' rows would have been deleted. This is a dry run.';
-    private string $runMessage    = ' rows have been deleted.';
-
-    public function __construct(ManagerRegistry $doctrine)
+    public function __construct(EventLogCleanup $eventLogCleanup)
     {
-        $this->doctrine = $doctrine;
+        $this->eventLogCleanup = $eventLogCleanup;
 
         parent::__construct(null);
     }
@@ -64,7 +48,7 @@ class EventLogCleanupCommand extends Command
             )
             ->setHelp(
                 <<<'EOT'
-                The <info>%command.name%</info> command is used to clean up the campaign_lead_event_log, email_stats and lead_event_log table.
+                The <info>%command.name%</info> command is used to clean up the campaign_lead_event_log, lead_event_log and email_stats table.
 
                 <info>php %command.full_name%</info>
                 
@@ -77,13 +61,13 @@ class EventLogCleanupCommand extends Command
                 You can also optionally specify for which campaign the entries should be purged from campaign_lead_event_log:
                 <info>php %command.full_name% --cmp-id=123</info> 
                 
-                Purge only Campaign Lead Event Log Records:
+                Purge only campaign_lead_event_log records:
                 <info>php %command.full_name% --campaign-lead </info> 
                 
-                Purge only Lead Event Log Records
+                Purge only lead_event_log records
                 <info>php %command.full_name% --lead</info> 
                 
-                Purge only Email Stats Records:
+                Purge only email_stats records:
                 <info>php %command.full_name% --email-stats </info> 
                 EOT
             );
@@ -95,9 +79,9 @@ class EventLogCleanupCommand extends Command
         $dryRun                               = $input->getOption('dry-run');
         $campaignId                           = 'none' === $input->getOption('cmp-id') ? null : (int) $input->getOption('cmp-id');
         $operations                           = [
-            self::CAMPAIGN_LEAD_EVENTS => $input->getOption('campaign-lead'),
-            self::LEAD_EVENTS          => $input->getOption('lead'),
-            self::EMAIL_STATS          => $input->getOption('email-stats'),
+            EventLogCleanup::CAMPAIGN_LEAD_EVENTS => $input->getOption('campaign-lead'),
+            EventLogCleanup::LEAD_EVENTS          => $input->getOption('lead'),
+            EventLogCleanup::EMAIL_STATS          => $input->getOption('email-stats'),
         ];
 
         if (0 === array_sum($operations)) {
@@ -105,87 +89,21 @@ class EventLogCleanupCommand extends Command
         }
 
         try {
-            $deletedRows = $this->deleteCmpLeadEventLogEntries($daysOld, $campaignId, $dryRun, $operations);
+            $message = $this->eventLogCleanup->deleteEventLogEntries(
+                $daysOld,
+                $campaignId,
+                $dryRun,
+                $operations,
+                $output
+            );
         } catch (Exception $e) {
             $output->writeln(sprintf('<error>Deletion of Log Rows failed because of database error: %s</error>', $e->getMessage()));
 
             return 1;
         }
 
-        $message = '';
-        foreach ($operations as $operation => $enabled) {
-            if (false === $enabled) {
-                continue;
-            }
-
-            if ('' !== $message) {
-                if (self::EMAIL_STATS === $operation) {
-                    $message .= ' and ';
-                } else {
-                    $message .= ', ';
-                }
-            }
-
-            $message .= $deletedRows[$operation].' '.$operation;
-        }
-
-        $message .= $dryRun ? $this->dryRunMessage : $this->runMessage;
         $output->writeln('<info>'.$message.'<info>');
 
         return 0;
-    }
-
-    /**
-     * @param non-empty-array<string, bool> $operations
-     *
-     * @return non-empty-array<string, int>
-     */
-    public function deleteCmpLeadEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, array $operations): array
-    {
-        $prefix = MAUTIC_TABLE_PREFIX;
-        $em     = $this->doctrine->getManager();
-
-        $params = [
-            ':daysOld' => $daysOld,
-        ];
-        $types = [
-            ':daysold' => \PDO::PARAM_INT,
-        ];
-
-        if (null !== $campaignId && $operations[self::CAMPAIGN_LEAD_EVENTS]) {
-            $params[':cmpId'] = $campaignId;
-            $types[':cmpId']  = \PDO::PARAM_INT;
-            $this->queries[self::CAMPAIGN_LEAD_EVENTS] .= ' AND campaign_id = :cmpId';
-        }
-
-        $result = [
-            self::CAMPAIGN_LEAD_EVENTS => 0,
-            self::LEAD_EVENTS          => 0,
-            self::EMAIL_STATS          => 0,
-        ];
-
-        if ($dryRun) {
-            foreach ($operations as $operation => $enabled) {
-                if (false === $enabled) {
-                    continue;
-                }
-
-                $sql                     = 'SELECT * FROM '.$prefix.' '.$this->queries[$operation];
-                $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                $result[$operation]      = $stmt->rowCount();
-            }
-        } else {
-            foreach ($operations as $operation => $enabled) {
-                if (false === $enabled) {
-                    continue;
-                }
-
-                $sql                     = 'DELETE FROM '.$prefix.' '.$this->queries[$operation];
-                $stmt                    = $em->getConnection()->executeQuery($sql, $params, $types);
-                $result[$operation]      = $stmt->rowCount();
-            }
-        }
-
-        return $result;
     }
 }
