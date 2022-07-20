@@ -13,14 +13,14 @@
     "require": {
         "php": "^7.4",
         "ext-pdo": "*",
-        "mautic/core-lib": "^3.0|^4.0",
-        "phpunit/phpunit": "^9.5"
+        "mautic/core-lib": "^3.0|^4.0"
     },
     "extra": {
         "install-directory-name": "MauticHousekeepingBundle"
     },
     "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.4"
+        "friendsofphp/php-cs-fixer": "^3.4",
+        "phpunit/phpunit": "^9.5"
     },
     "autoload": {
         "psr-4": {
