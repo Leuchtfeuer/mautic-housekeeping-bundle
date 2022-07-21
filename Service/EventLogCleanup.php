@@ -20,7 +20,7 @@ class EventLogCleanup
      * @var array<string, string>
      */
     private array $queries = [
-        self::CAMPAIGN_LEAD_EVENTS => 'campaign_lead_event_log clel WHERE (clel.id NOT IN (SELECT MAX(clel2.id) FROM campaign_lead_event_log clel2) AND clel.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
+        self::CAMPAIGN_LEAD_EVENTS => 'campaign_lead_event_log WHERE (campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM campaign_lead_event_log clel2 GROUP BY lead_id) as maxIds) AND campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
         self::LEAD_EVENTS          => 'lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
         self::EMAIL_STATS          => 'email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
     ];
@@ -58,6 +58,8 @@ class EventLogCleanup
             self::EMAIL_STATS          => 0,
         ];
 
+        $this->connection->beginTransaction();
+
         if ($dryRun) {
             foreach ($operations as $operation => $enabled) {
                 if (false === $enabled) {
@@ -86,6 +88,13 @@ class EventLogCleanup
                     $output->writeln($sql);
                 }
             }
+        }
+
+        try {
+            $this->connection->commit();
+        } catch (\Throwable $throwable) {
+            $this->connection->rollBack();
+            throw $throwable;
         }
 
         $message       = '';
