@@ -70,7 +70,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysold' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT * FROM prefix_table_campaign_lead_event_log WHERE (campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM campaign_lead_event_log clel2 GROUP BY lead_id) as maxIds) AND campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
+                    'SELECT * FROM prefix_table_campaign_lead_event_log WHERE (prefix_table_campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM prefix_table_campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND prefix_table_campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
                     [':daysOld' => $daysOld],
                     [':daysold' => \PDO::PARAM_INT],
                 ],
@@ -125,7 +125,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysold' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT * FROM prefix_table_campaign_lead_event_log WHERE (campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM campaign_lead_event_log clel2 GROUP BY lead_id) as maxIds) AND campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) AND campaign_id = :cmpId',
+                    'SELECT * FROM prefix_table_campaign_lead_event_log WHERE (prefix_table_campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM prefix_table_campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND prefix_table_campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) AND campaign_id = :cmpId',
                     [':daysOld' => $daysOld, ':cmpId' => 12235],
                     [':daysold' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
                 ],
@@ -145,7 +145,7 @@ class EventLogCleanupTest extends TestCase
             ],
             [
                 [
-                    'SELECT * FROM prefix_table_campaign_lead_event_log WHERE (campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM campaign_lead_event_log clel2 GROUP BY lead_id) as maxIds) AND campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) AND campaign_id = :cmpId',
+                    'SELECT * FROM prefix_table_campaign_lead_event_log WHERE (prefix_table_campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM prefix_table_campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND prefix_table_campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) AND campaign_id = :cmpId',
                     [':daysOld' => $daysOld, ':cmpId' => 65487],
                     [':daysold' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
                 ],
@@ -175,7 +175,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysold' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE FROM prefix_table_campaign_lead_event_log WHERE (campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM campaign_lead_event_log clel2 GROUP BY lead_id) as maxIds) AND campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
+                    'DELETE FROM prefix_table_campaign_lead_event_log WHERE (prefix_table_campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM prefix_table_campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND prefix_table_campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
                     [':daysOld' => $daysOld],
                     [':daysold' => \PDO::PARAM_INT],
                 ],
@@ -230,7 +230,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysold' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE FROM prefix_table_campaign_lead_event_log WHERE (campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM campaign_lead_event_log clel2 GROUP BY lead_id) as maxIds) AND campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) AND campaign_id = :cmpId',
+                    'DELETE FROM prefix_table_campaign_lead_event_log WHERE (prefix_table_campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM prefix_table_campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND prefix_table_campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) AND campaign_id = :cmpId',
                     [':daysOld' => $daysOld, ':cmpId' => 12235],
                     [':daysold' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
                 ],
@@ -250,7 +250,7 @@ class EventLogCleanupTest extends TestCase
             ],
             [
                 [
-                    'DELETE FROM prefix_table_campaign_lead_event_log WHERE (campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM campaign_lead_event_log clel2 GROUP BY lead_id) as maxIds) AND campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) AND campaign_id = :cmpId',
+                    'DELETE FROM prefix_table_campaign_lead_event_log WHERE (prefix_table_campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM prefix_table_campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND prefix_table_campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) AND campaign_id = :cmpId',
                     [':daysOld' => $daysOld, ':cmpId' => 65487],
                     [':daysold' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
                 ],

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticHousekeepingBundle\Command;
 
-use Exception;
 use MauticPlugin\MauticHousekeepingBundle\Service\EventLogCleanup;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Throwable;
 
 class EventLogCleanupCommand extends Command
 {
@@ -96,7 +96,7 @@ class EventLogCleanupCommand extends Command
                 $operations,
                 $output
             );
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $output->writeln(sprintf('<error>Deletion of Log Rows failed because of database error: %s</error>', $e->getMessage()));
 
             return 1;
