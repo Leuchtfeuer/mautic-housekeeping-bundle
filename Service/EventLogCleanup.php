@@ -9,6 +9,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class EventLogCleanup
 {
+    private const PREFIX = '%PREFIX%';
+
     private Connection $connection;
     private string $dbPrefix;
 
@@ -20,9 +22,9 @@ class EventLogCleanup
      * @var array<string, string>
      */
     private array $queries = [
-        self::CAMPAIGN_LEAD_EVENTS => 'campaign_lead_event_log WHERE (campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM campaign_lead_event_log clel2 GROUP BY lead_id) as maxIds) AND campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
-        self::LEAD_EVENTS          => 'lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-        self::EMAIL_STATS          => 'email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+        self::CAMPAIGN_LEAD_EVENTS => self::PREFIX.'campaign_lead_event_log WHERE ('.self::PREFIX.'campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM '.self::PREFIX.'campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND '.self::PREFIX.'campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
+        self::LEAD_EVENTS          => self::PREFIX.'lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+        self::EMAIL_STATS          => self::PREFIX.'email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
     ];
 
     private string $dryRunMessage = ' rows would have been deleted. This is a dry run.';
@@ -66,7 +68,7 @@ class EventLogCleanup
                     continue;
                 }
 
-                $sql                     = 'SELECT * FROM '.$this->dbPrefix.$this->queries[$operation];
+                $sql                     = 'SELECT * FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
                 $statement               = $this->connection->executeQuery($sql, $params, $types);
                 $result[$operation]      = $statement->rowCount();
 
@@ -80,7 +82,7 @@ class EventLogCleanup
                     continue;
                 }
 
-                $sql                     = 'DELETE FROM '.$this->dbPrefix.$this->queries[$operation];
+                $sql                     = 'DELETE FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
                 $statement               = $this->connection->executeQuery($sql, $params, $types);
                 $result[$operation]      = $statement->rowCount();
 
