@@ -26,3 +26,5 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 - Afterwards, the cache must be cleared.
 
 
+## Notice
+- Every last entry from the campaign_lead_event_log per campaign will be kept. This is due to contacts restarting campaigns if there is no last step preserved in the log. 
