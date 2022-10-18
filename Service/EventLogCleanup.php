@@ -14,9 +14,11 @@ class EventLogCleanup
     private Connection $connection;
     private string $dbPrefix;
 
+    public const DEFAULT_DAYS         = 365;
     public const CAMPAIGN_LEAD_EVENTS = 'campaign_lead_event_log';
     public const LEAD_EVENTS          = 'lead_event_log';
     public const EMAIL_STATS          = 'email_stats';
+    private const EMAIL_STATS_DEVICES = 'email_stats_devices';
 
     /**
      * @var array<string, string>
@@ -25,6 +27,37 @@ class EventLogCleanup
         self::CAMPAIGN_LEAD_EVENTS => self::PREFIX.'campaign_lead_event_log WHERE ('.self::PREFIX.'campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM '.self::PREFIX.'campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND '.self::PREFIX.'campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
         self::LEAD_EVENTS          => self::PREFIX.'lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
         self::EMAIL_STATS          => self::PREFIX.'email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+        self::EMAIL_STATS_DEVICES  => self::PREFIX.'email_stats_devices LEFT JOIN '.self::PREFIX.'email_stats ON '.self::PREFIX.'email_stats.id = '.self::PREFIX.'email_stats_devices.stat_id WHERE '.self::PREFIX.'email_stats.id IS NULL OR '.self::PREFIX.'email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+    ];
+
+    private array $params = [
+        self::CAMPAIGN_LEAD_EVENTS => [
+            ':daysOld' => self::DEFAULT_DAYS,
+        ],
+        self::LEAD_EVENTS => [
+            ':daysOld' => self::DEFAULT_DAYS,
+        ],
+        self::EMAIL_STATS => [
+            ':daysOld' => self::DEFAULT_DAYS,
+        ],
+        self::EMAIL_STATS_DEVICES => [
+            ':daysOld' => self::DEFAULT_DAYS,
+        ],
+    ];
+
+    private array $types = [
+        self::CAMPAIGN_LEAD_EVENTS => [
+            ':daysOld' => \PDO::PARAM_INT,
+        ],
+        self::LEAD_EVENTS          => [
+            ':daysOld' => \PDO::PARAM_INT,
+        ],
+        self::EMAIL_STATS          => [
+            ':daysOld' => \PDO::PARAM_INT,
+        ],
+        self::EMAIL_STATS_DEVICES  => [
+            ':daysOld' => \PDO::PARAM_INT,
+        ],
     ];
 
     private string $dryRunMessage = ' rows would have been deleted. This is a dry run.';
@@ -41,23 +74,27 @@ class EventLogCleanup
      */
     public function deleteEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, array $operations, OutputInterface $output): string
     {
-        $params = [
-            ':daysOld' => $daysOld,
-        ];
-        $types = [
-            ':daysold' => \PDO::PARAM_INT,
-        ];
+        if (self::DEFAULT_DAYS !== $daysOld) {
+            foreach ($this->params as $index => $item) {
+                $this->params[$index][':daysOld'] = $daysOld;
+            }
+        }
 
         if (null !== $campaignId && $operations[self::CAMPAIGN_LEAD_EVENTS]) {
-            $params[':cmpId'] = $campaignId;
-            $types[':cmpId']  = \PDO::PARAM_INT;
+            $this->params[self::CAMPAIGN_LEAD_EVENTS][':cmpId'] = $campaignId;
+            $this->types[self::CAMPAIGN_LEAD_EVENTS][':cmpId']  = \PDO::PARAM_INT;
             $this->queries[self::CAMPAIGN_LEAD_EVENTS] .= ' AND campaign_id = :cmpId';
+        }
+
+        if (array_key_exists(self::EMAIL_STATS, $operations) && true === $operations[self::EMAIL_STATS]) {
+            $operations[self::EMAIL_STATS_DEVICES] = true;
         }
 
         $result = [
             self::CAMPAIGN_LEAD_EVENTS => 0,
             self::LEAD_EVENTS          => 0,
             self::EMAIL_STATS          => 0,
+            self::EMAIL_STATS_DEVICES  => 0,
         ];
 
         $this->connection->beginTransaction();
@@ -69,7 +106,7 @@ class EventLogCleanup
                 }
 
                 $sql                     = 'SELECT * FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
-                $statement               = $this->connection->executeQuery($sql, $params, $types);
+                $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
                 $result[$operation]      = $statement->rowCount();
 
                 if ($output->isVerbose()) {
@@ -82,8 +119,8 @@ class EventLogCleanup
                     continue;
                 }
 
-                $sql                     = 'DELETE FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
-                $statement               = $this->connection->executeQuery($sql, $params, $types);
+                $sql                     = 'DELETE '.$this->dbPrefix.$operation.' FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
+                $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
                 $result[$operation]      = $statement->rowCount();
 
                 if ($output->isVerbose()) {
