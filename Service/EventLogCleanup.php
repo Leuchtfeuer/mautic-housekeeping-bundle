@@ -87,7 +87,9 @@ class EventLogCleanup
         }
 
         if (array_key_exists(self::EMAIL_STATS, $operations) && true === $operations[self::EMAIL_STATS]) {
+            unset($operations[self::EMAIL_STATS]);
             $operations[self::EMAIL_STATS_DEVICES] = true;
+            $operations[self::EMAIL_STATS]         = true;
         }
 
         $result = [
