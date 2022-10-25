@@ -42,13 +42,13 @@ class EventLogCleanupCommand extends Command
                     new InputOption('dry-run', 'r', InputOption::VALUE_NONE, 'Do a dry run without actually deleting anything.'),
                     new InputOption('campaign-lead', 'c', InputOption::VALUE_NONE, 'Purge only Campaign Lead Event Log Records'),
                     new InputOption('lead', 'l', InputOption::VALUE_NONE, 'Purge only Lead Event Log Records'),
-                    new InputOption('email-stats', 'm', InputOption::VALUE_NONE, 'Purge only Email Stats Records'),
+                    new InputOption('email-stats', 'm', InputOption::VALUE_NONE, 'Purge only Email Stats Records + Email Stats Devices'),
                     new InputOption('cmp-id', 'i', InputOption::VALUE_OPTIONAL, 'Delete only campaign_lead_eventLog for a specific CampaignID', 'none'),
                 ]
             )
             ->setHelp(
                 <<<'EOT'
-                The <info>%command.name%</info> command is used to clean up the campaign_lead_event_log, lead_event_log and email_stats table.
+                The <info>%command.name%</info> command is used to clean up the campaign_lead_event_log, lead_event_log, email_stats and email_stats_devices table.
 
                 <info>php %command.full_name%</info>
                 
@@ -67,7 +67,7 @@ class EventLogCleanupCommand extends Command
                 Purge only lead_event_log records
                 <info>php %command.full_name% --lead</info> 
                 
-                Purge only email_stats records:
+                Purge only email_stats and email_stats_devices records:
                 <info>php %command.full_name% --email-stats </info> 
                 EOT
             );
