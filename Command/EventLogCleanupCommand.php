@@ -43,12 +43,13 @@ class EventLogCleanupCommand extends Command
                     new InputOption('campaign-lead', 'c', InputOption::VALUE_NONE, 'Purge only Campaign Lead Event Log Records'),
                     new InputOption('lead', 'l', InputOption::VALUE_NONE, 'Purge only Lead Event Log Records'),
                     new InputOption('email-stats', 'm', InputOption::VALUE_NONE, 'Purge only Email Stats Records + Email Stats Devices'),
+                    new InputOption('email-stats-tokens', 't', InputOption::VALUE_NONE, 'Set tokens field in email_stats to NULL. Important: This one will not be executed, if the option flag -t (or email-stats-tokens) is not set in the command. And: This option can not be combined with any -c, -l or -m in one command at the moment.'),
                     new InputOption('cmp-id', 'i', InputOption::VALUE_OPTIONAL, 'Delete only campaign_lead_eventLog for a specific CampaignID', 'none'),
                 ]
             )
             ->setHelp(
                 <<<'EOT'
-                The <info>%command.name%</info> command is used to clean up the campaign_lead_event_log, lead_event_log, email_stats and email_stats_devices table.
+                The <info>%command.name%</info> command is used to clean up the campaign_lead_event_log, lead_event_log, email_stats and email_stats_devices table or if the option flag -t is set, just set the content of the field tokens in email_stats to NULL.
 
                 <info>php %command.full_name%</info>
                 
@@ -68,7 +69,10 @@ class EventLogCleanupCommand extends Command
                 <info>php %command.full_name% --lead</info> 
                 
                 Purge only email_stats and email_stats_devices records:
-                <info>php %command.full_name% --email-stats </info> 
+                <info>php %command.full_name% --email-stats</info>
+                
+                Set tokens field in email_stats to NULL:
+                <info>php %command.full_name% --email-stats-tokens</info> 
                 EOT
             );
     }
@@ -82,10 +86,13 @@ class EventLogCleanupCommand extends Command
             EventLogCleanup::CAMPAIGN_LEAD_EVENTS => $input->getOption('campaign-lead'),
             EventLogCleanup::LEAD_EVENTS          => $input->getOption('lead'),
             EventLogCleanup::EMAIL_STATS          => $input->getOption('email-stats'),
+            EventLogCleanup::EMAIL_STATS_TOKENS   => $input->getOption('email-stats-tokens')
         ];
 
         if (0 === array_sum($operations)) {
             $operations = array_combine(array_keys($operations), array_fill(0, count($operations), true));
+            array_pop($operations);
+            $operations["email_stats_tokens"] = false;
         }
 
         try {

@@ -18,6 +18,7 @@ class EventLogCleanup
     public const CAMPAIGN_LEAD_EVENTS = 'campaign_lead_event_log';
     public const LEAD_EVENTS          = 'lead_event_log';
     public const EMAIL_STATS          = 'email_stats';
+    public const EMAIL_STATS_TOKENS   = 'email_stats_tokens';
     private const EMAIL_STATS_DEVICES = 'email_stats_devices';
 
     /**
@@ -27,6 +28,7 @@ class EventLogCleanup
         self::CAMPAIGN_LEAD_EVENTS => self::PREFIX.'campaign_lead_event_log WHERE ('.self::PREFIX.'campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM '.self::PREFIX.'campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND '.self::PREFIX.'campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
         self::LEAD_EVENTS          => self::PREFIX.'lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
         self::EMAIL_STATS          => self::PREFIX.'email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+        self::EMAIL_STATS_TOKENS   => self::PREFIX.'email_stats SET tokens = NULL WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
         self::EMAIL_STATS_DEVICES  => self::PREFIX.'email_stats_devices LEFT JOIN '.self::PREFIX.'email_stats ON '.self::PREFIX.'email_stats.id = '.self::PREFIX.'email_stats_devices.stat_id WHERE '.self::PREFIX.'email_stats.id IS NULL OR '.self::PREFIX.'email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
     ];
 
@@ -34,13 +36,16 @@ class EventLogCleanup
         self::CAMPAIGN_LEAD_EVENTS => [
             ':daysOld' => self::DEFAULT_DAYS,
         ],
-        self::LEAD_EVENTS => [
+        self::LEAD_EVENTS          => [
             ':daysOld' => self::DEFAULT_DAYS,
         ],
-        self::EMAIL_STATS => [
+        self::EMAIL_STATS          => [
             ':daysOld' => self::DEFAULT_DAYS,
         ],
-        self::EMAIL_STATS_DEVICES => [
+        self::EMAIL_STATS_TOKENS   => [
+            ':daysOld' => self::DEFAULT_DAYS,
+        ],
+        self::EMAIL_STATS_DEVICES  => [
             ':daysOld' => self::DEFAULT_DAYS,
         ],
     ];
@@ -55,6 +60,9 @@ class EventLogCleanup
         self::EMAIL_STATS          => [
             ':daysOld' => \PDO::PARAM_INT,
         ],
+        self::EMAIL_STATS_TOKENS   => [
+            ':daysOld' => \PDO::PARAM_INT,
+        ],
         self::EMAIL_STATS_DEVICES  => [
             ':daysOld' => \PDO::PARAM_INT,
         ],
@@ -62,6 +70,9 @@ class EventLogCleanup
 
     private string $dryRunMessage = ' rows would have been deleted. This is a dry run.';
     private string $runMessage    = ' rows have been deleted.';
+
+    private string $dryRunMessageTokens = ' will be set to NULL. This is a dry run.';
+    private string $runMessageTokens    = ' have been set to NULL.';
 
     public function __construct(Connection $connection, ?string $dbPrefix)
     {
@@ -92,10 +103,16 @@ class EventLogCleanup
             $operations[self::EMAIL_STATS]         = true;
         }
 
+        if (array_key_exists(self::EMAIL_STATS_TOKENS, $operations) && true === $operations[self::EMAIL_STATS_TOKENS]) {
+            unset($operations[self::EMAIL_STATS_TOKENS]);
+            $operations[self::EMAIL_STATS_TOKENS]  = true;
+        }
+
         $result = [
             self::CAMPAIGN_LEAD_EVENTS => 0,
             self::LEAD_EVENTS          => 0,
             self::EMAIL_STATS          => 0,
+            self::EMAIL_STATS_TOKENS   => 0,
             self::EMAIL_STATS_DEVICES  => 0,
         ];
 
@@ -107,7 +124,11 @@ class EventLogCleanup
                     continue;
                 }
 
-                $sql                     = 'SELECT * FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
+                if (true === $operations['email_stats_tokens']) {
+                    $sql = 'SELECT * FROM email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)';
+                } else {
+                    $sql = 'SELECT * FROM ' . str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
+                }
                 $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
                 $result[$operation]      = $statement->rowCount();
 
@@ -121,7 +142,13 @@ class EventLogCleanup
                     continue;
                 }
 
-                $sql                     = 'DELETE '.$this->dbPrefix.$operation.' FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
+                if (true === $operations['email_stats_tokens']) {
+                    $sql = 'UPDATE '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
+                }
+                else {
+                    $sql = 'DELETE '.$this->dbPrefix.$operation.' FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
+                }
+
                 $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
                 $result[$operation]      = $statement->rowCount();
 
@@ -155,9 +182,11 @@ class EventLogCleanup
 
             $message .= $result[$operation].' '.$operation;
         }
-
-        $message .= $dryRun ? $this->dryRunMessage : $this->runMessage;
-
+        if (true === $operations['email_stats_tokens']) {
+            $message .= $dryRun ? $this->dryRunMessageTokens : $this->runMessageTokens;
+        } else {
+            $message .= $dryRun ? $this->dryRunMessage : $this->runMessage;
+        }
         return $message;
     }
 }
