@@ -28,7 +28,7 @@ class EventLogCleanup
         self::CAMPAIGN_LEAD_EVENTS => self::PREFIX.'campaign_lead_event_log WHERE ('.self::PREFIX.'campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM '.self::PREFIX.'campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND '.self::PREFIX.'campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
         self::LEAD_EVENTS          => self::PREFIX.'lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
         self::EMAIL_STATS          => self::PREFIX.'email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-        self::EMAIL_STATS_TOKENS   => self::PREFIX.'email_stats SET tokens = NULL WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+        self::EMAIL_STATS_TOKENS   => self::PREFIX.'email_stats SET tokens = NULL WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL',
         self::EMAIL_STATS_DEVICES  => self::PREFIX.'email_stats_devices LEFT JOIN '.self::PREFIX.'email_stats ON '.self::PREFIX.'email_stats.id = '.self::PREFIX.'email_stats_devices.stat_id WHERE '.self::PREFIX.'email_stats.id IS NULL OR '.self::PREFIX.'email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
     ];
 
@@ -125,12 +125,15 @@ class EventLogCleanup
                 }
 
                 if (true === $operations['email_stats_tokens']) {
-                    $sql = 'SELECT * FROM email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)';
+                    $sql = 'SELECT * FROM email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL';
+                    $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
+                    $result[$operation]      = $statement->rowCount();
                 } else {
                     $sql = 'SELECT * FROM ' . str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
+                    $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
+                    $result[$operation]      = $statement->rowCount();
                 }
-                $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
-                $result[$operation]      = $statement->rowCount();
+
 
                 if ($output->isVerbose()) {
                     $output->writeln($sql);
