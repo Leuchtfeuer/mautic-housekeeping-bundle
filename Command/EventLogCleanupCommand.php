@@ -43,13 +43,13 @@ class EventLogCleanupCommand extends Command
                     new InputOption('campaign-lead', 'c', InputOption::VALUE_NONE, 'Purge only Campaign Lead Event Log Records'),
                     new InputOption('lead', 'l', InputOption::VALUE_NONE, 'Purge only Lead Event Log Records'),
                     new InputOption('email-stats', 'm', InputOption::VALUE_NONE, 'Purge only Email Stats Records + Email Stats Devices'),
-                    new InputOption('email-stats-tokens', 't', InputOption::VALUE_NONE, 'Set tokens field in email_stats to NULL. Important: This one will not be executed, if the option flag -t (or email-stats-tokens) is not set in the command. And: This option can not be combined with any -c, -l or -m in one command at the moment.'),
+                    new InputOption('email-stats-tokens', 't', InputOption::VALUE_NONE, 'Set tokens field in Email Stats Records to NULL. Important: This one will not be executed if the option flag -t (or email-stats-tokens) is not set in the command. And: This option can not be combined with any -c, -l or -m in one command at the moment.'),
                     new InputOption('cmp-id', 'i', InputOption::VALUE_OPTIONAL, 'Delete only campaign_lead_eventLog for a specific CampaignID', 'none'),
                 ]
             )
             ->setHelp(
                 <<<'EOT'
-                The <info>%command.name%</info> command is used to clean up the campaign_lead_event_log, lead_event_log, email_stats and email_stats_devices table or if the option flag -t is set, just set the content of the field tokens in email_stats to NULL.
+                The <info>%command.name%</info> command is used to clean up the campaign_lead_event_log, lead_event_log, email_stats and email_stats_devices table OR just the field tokens in email_stats if the option flag -t is set.
 
                 <info>php %command.full_name%</info>
                 
@@ -93,6 +93,12 @@ class EventLogCleanupCommand extends Command
             $operations = array_combine(array_keys($operations), array_fill(0, count($operations), true));
             array_pop($operations);
             $operations["email_stats_tokens"] = false;
+        }
+
+        if (($operations["email_stats_tokens"] === true) && ((($operations["email_stats"] === true) || ($operations["campaign_lead_event_log"] === true)) || ($operations["lead_event_log"] === true))) {
+            $output->writeln('<error>The combination of “-t” flag with either “-m” flag or “-c” flag or “-l” flag is not supported/possible. You can only combine the "-t" flag with "-d" flag and/or "-r" flag.</error>');
+
+            return 1;
         }
 
         try {
