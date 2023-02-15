@@ -42,14 +42,14 @@ class EventLogCleanupCommand extends Command
                     new InputOption('dry-run', 'r', InputOption::VALUE_NONE, 'Do a dry run without actually deleting anything.'),
                     new InputOption('campaign-lead', 'c', InputOption::VALUE_NONE, 'Purge only Campaign Lead Event Log Records'),
                     new InputOption('lead', 'l', InputOption::VALUE_NONE, 'Purge only Lead Event Log Records'),
-                    new InputOption('email-stats', 'm', InputOption::VALUE_NONE, 'Purge only Email Stats Records + Email Stats Devices'),
-                    new InputOption('email-stats-tokens', 't', InputOption::VALUE_NONE, 'Set tokens field in Email Stats Records to NULL. Important: This one will not be executed if the option flag -t (or email-stats-tokens) is not set in the command. And: This option can not be combined with any -c, -l or -m in one command at the moment.'),
+                    new InputOption('email-stats', 'm', InputOption::VALUE_NONE, 'Purge only Email Stats Records the referenced emails entry is currently not published and purge Email Stats Devices. Important: If referenced email is ever switched back to published, the contacts will get the email again.'),
+                    new InputOption('email-stats-tokens', 't', InputOption::VALUE_NONE, 'Set only tokens fields in Email Stats Records to NULL. Important: This option can not be combined with any "-c", "-l" or "-m" flag in one command. And: If the option flag "-t" is not set, the NULL setting of tokens will not be done with the basis command, so if you just run mautic:leuchtfeuer:housekeeping without a flag)'),
                     new InputOption('cmp-id', 'i', InputOption::VALUE_OPTIONAL, 'Delete only campaign_lead_eventLog for a specific CampaignID', 'none'),
                 ]
             )
             ->setHelp(
                 <<<'EOT'
-                The <info>%command.name%</info> command is used to clean up the campaign_lead_event_log, lead_event_log, email_stats and email_stats_devices table OR just the field tokens in email_stats if the option flag -t is set.
+                The <info>%command.name%</info> command is used to clean up the campaign_lead_event_log table, the lead_event_log table, the email_stats table (but only email_stats entries the referenced emails entry is currently not published) and the email_stats_devices table or just clean up the field tokens in email_stats if the option flag "-t" is set.
 
                 <info>php %command.full_name%</info>
                 
@@ -68,7 +68,7 @@ class EventLogCleanupCommand extends Command
                 Purge only lead_event_log records
                 <info>php %command.full_name% --lead</info> 
                 
-                Purge only email_stats and email_stats_devices records:
+                Purge only email_stats the referenced emails entry is currently not published and email_stats_devices records [Important: If referenced email is ever switched back to published, the contacts will get the email again]:
                 <info>php %command.full_name% --email-stats</info>
                 
                 Set tokens field in email_stats to NULL:
