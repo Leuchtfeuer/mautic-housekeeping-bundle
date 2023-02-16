@@ -103,11 +103,6 @@ class EventLogCleanup
             $operations[self::EMAIL_STATS]         = true;
         }
 
-        if (array_key_exists(self::EMAIL_STATS_TOKENS, $operations) && true === $operations[self::EMAIL_STATS_TOKENS]) {
-            unset($operations[self::EMAIL_STATS_TOKENS]);
-            $operations[self::EMAIL_STATS_TOKENS]  = true;
-        }
-
         $result = [
             self::CAMPAIGN_LEAD_EVENTS => 0,
             self::LEAD_EVENTS          => 0,
@@ -124,7 +119,7 @@ class EventLogCleanup
                     continue;
                 }
 
-                if (true === $operations['email_stats_tokens']) {
+                if (true === $operations[self::EMAIL_STATS_TOKENS]) {
                     $sql = 'SELECT * FROM email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL';
                     $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
                     $result[$operation]      = $statement->rowCount();
@@ -145,7 +140,7 @@ class EventLogCleanup
                     continue;
                 }
 
-                if (true === $operations['email_stats_tokens']) {
+                if (true === $operations[self::EMAIL_STATS_TOKENS]) {
                     $sql = 'UPDATE '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
                 }
                 else {
@@ -185,7 +180,7 @@ class EventLogCleanup
 
             $message .= $result[$operation].' '.$operation;
         }
-        if (true === $operations['email_stats_tokens']) {
+        if (true === $operations[self::EMAIL_STATS_TOKENS]) {
             $message .= $dryRun ? $this->dryRunMessageTokens : $this->runMessageTokens;
         } else {
             $message .= $dryRun ? $this->dryRunMessage : $this->runMessage;
