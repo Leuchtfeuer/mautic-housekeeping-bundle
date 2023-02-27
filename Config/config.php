@@ -2,8 +2,8 @@
 
 return [
     'name'        => 'Leuchtfeuer Housekeeping',
-    'description' => 'EventLog Cleanup Command',
-    'version'     => '1.0.1',
+    'description' => 'Database Cleanup Command to delete lead_event_log, campaign_lead_event_log, email_stats and email_stats_devices table entries.',
+    'version'     => '1.3',
     'author'      => 'Leuchtfeuer Digital Marketing GmbH',
     'services'    => [
         'command' => [

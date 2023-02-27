@@ -29,7 +29,7 @@ class EventLogCleanupCommand extends Command
     protected function configure(): void
     {
         $this->setName(self::$defaultName)
-            ->setDescription('EventLog Cleanup Command')
+            ->setDescription('Database Cleanup Command to delete lead_event_log, campaign_lead_event_log, email_stats and email_stats_devices table entries.')
             ->setDefinition(
                 [
                     new InputOption(
