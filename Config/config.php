@@ -1,10 +1,10 @@
 <?php
 
 return [
-    'name'        => 'Mautic Housekeeping Bundle',
+    'name'        => 'Leuchtfeuer Housekeeping',
     'description' => 'EventLog Cleanup Command',
     'version'     => '1.0.1',
-    'author'      => 'Mautic',
+    'author'      => 'Leuchtfeuer Digital Marketing GmbH',
     'services'    => [
         'command' => [
             'mautic.leuchtfeuer.command.housekeeping' => [

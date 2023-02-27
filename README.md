@@ -1,5 +1,5 @@
-# Mautic Housekeeping Bundle
-This bundle provides a Mautic Housekeeping Command for database cleanup purposes.
+# Leuchtfeuer Housekeeping
+This plugin provides a Mautic Housekeeping Command for database cleanup purposes.
 
 ## Command
 
@@ -21,10 +21,15 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 
 
 ### Installation
-- Plugin must be saved under plugins/MauticHouskeepingBundle/ 
+- Plugin must be saved under plugins/MauticHousekeepingBundle/ 
 
 - Afterwards, the cache must be cleared.
 
 
 ## Notice
 - Every last entry from the campaign_lead_event_log per campaign will be kept. This is due to contacts restarting campaigns if there is no last step preserved in the log. 
+
+### Author
+Leuchtfeuer Digital Marketing GmbH
+
+mautic@Leuchtfeuer.com
