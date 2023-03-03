@@ -1,4 +1,4 @@
-# Leuchtfeuer Housekeeping
+# Housekeeping by Leuchtfeuer
 This plugin provides a Mautic Housekeeping Command for database cleanup purposes.
 
 ## Command

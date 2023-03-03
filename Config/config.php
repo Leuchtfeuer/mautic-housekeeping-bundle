@@ -1,9 +1,9 @@
 <?php
 
 return [
-    'name'        => 'Leuchtfeuer Housekeeping',
+    'name'        => 'Housekeeping by Leuchtfeuer',
     'description' => 'Database Cleanup Command to delete lead_event_log, campaign_lead_event_log, email_stats and email_stats_devices table entries.',
-    'version'     => '1.3',
+    'version'     => '1.3.1',
     'author'      => 'Leuchtfeuer Digital Marketing GmbH',
     'services'    => [
         'command' => [
