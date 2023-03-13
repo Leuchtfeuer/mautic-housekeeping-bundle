@@ -61,6 +61,7 @@ class EventLogCleanupTest extends TestCase
                 EventLogCleanup::LEAD_EVENTS          => true,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
                 EventLogCleanup::EMAIL_STATS          => true,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
             ],
             [
                 [
@@ -79,7 +80,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT * FROM prefix_table_email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'SELECT * FROM prefix_table_email_stats LEFT JOIN emails ON email_stats.email_id = emails.id WHERE is_published = 0 OR email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     [':daysOld' => $daysOld],
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
@@ -96,6 +97,7 @@ class EventLogCleanupTest extends TestCase
                 EventLogCleanup::LEAD_EVENTS          => true,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => false,
                 EventLogCleanup::EMAIL_STATS          => false,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
             ],
             [
                 [
@@ -116,6 +118,7 @@ class EventLogCleanupTest extends TestCase
                 EventLogCleanup::LEAD_EVENTS          => false,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => false,
                 EventLogCleanup::EMAIL_STATS          => true,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
             ],
             [
                 [
@@ -124,7 +127,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT * FROM prefix_table_email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'SELECT * FROM prefix_table_email_stats LEFT JOIN emails ON email_stats.email_id = emails.id WHERE is_published = 0 OR email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     [':daysOld' => $daysOld],
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
@@ -141,6 +144,7 @@ class EventLogCleanupTest extends TestCase
                 EventLogCleanup::EMAIL_STATS          => true,
                 EventLogCleanup::LEAD_EVENTS          => true,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
             ],
             [
                 [
@@ -159,7 +163,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT * FROM prefix_table_email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'SELECT * FROM prefix_table_email_stats LEFT JOIN emails ON email_stats.email_id = emails.id WHERE is_published = 0 OR email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     [':daysOld' => $daysOld],
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
@@ -176,6 +180,7 @@ class EventLogCleanupTest extends TestCase
                 EventLogCleanup::EMAIL_STATS          => false,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
                 EventLogCleanup::LEAD_EVENTS          => true,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
             ],
             [
                 [
@@ -190,7 +195,7 @@ class EventLogCleanupTest extends TestCase
                 ],
             ],
             [61, 22],
-            '61 campaign_lead_event_log and 22 lead_event_log rows would have been deleted. This is a dry run.',
+            '61 campaign_lead_event_log, 22 lead_event_log rows would have been deleted. This is a dry run.',
             true,
             65487,
         ];
@@ -201,6 +206,7 @@ class EventLogCleanupTest extends TestCase
                 EventLogCleanup::LEAD_EVENTS          => true,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
                 EventLogCleanup::EMAIL_STATS          => true,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
             ],
             [
                 [
@@ -219,7 +225,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN emails ON email_stats.email_id = emails.id WHERE is_published = 0 OR email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     [':daysOld' => $daysOld],
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
@@ -236,6 +242,7 @@ class EventLogCleanupTest extends TestCase
                 EventLogCleanup::LEAD_EVENTS          => true,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => false,
                 EventLogCleanup::EMAIL_STATS          => false,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
             ],
             [
                 [
@@ -256,6 +263,7 @@ class EventLogCleanupTest extends TestCase
                 EventLogCleanup::LEAD_EVENTS          => false,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => false,
                 EventLogCleanup::EMAIL_STATS          => true,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
             ],
             [
                 [
@@ -264,7 +272,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN emails ON email_stats.email_id = emails.id WHERE is_published = 0 OR email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     [':daysOld' => $daysOld],
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
@@ -281,6 +289,7 @@ class EventLogCleanupTest extends TestCase
                 EventLogCleanup::EMAIL_STATS          => true,
                 EventLogCleanup::LEAD_EVENTS          => true,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
             ],
             [
                 [
@@ -299,7 +308,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN emails ON email_stats.email_id = emails.id WHERE is_published = 0 OR email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     [':daysOld' => $daysOld],
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
@@ -316,6 +325,7 @@ class EventLogCleanupTest extends TestCase
                 EventLogCleanup::EMAIL_STATS          => false,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
                 EventLogCleanup::LEAD_EVENTS          => true,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
             ],
             [
                 [
@@ -330,7 +340,7 @@ class EventLogCleanupTest extends TestCase
                 ],
             ],
             [61, 22],
-            '61 campaign_lead_event_log and 22 lead_event_log rows have been deleted.',
+            '61 campaign_lead_event_log, 22 lead_event_log rows have been deleted.',
             false,
             65487,
         ];
