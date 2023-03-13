@@ -120,15 +120,14 @@ class EventLogCleanup
                 }
 
                 if (true === $operations[self::EMAIL_STATS_TOKENS]) {
-                    $sql = 'SELECT * FROM email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL';
+                    $sql                     = 'SELECT * FROM email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL';
                     $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
                     $result[$operation]      = $statement->rowCount();
                 } else {
-                    $sql = 'SELECT * FROM ' . str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
+                    $sql                     = 'SELECT * FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
                     $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
                     $result[$operation]      = $statement->rowCount();
                 }
-
 
                 if ($output->isVerbose()) {
                     $output->writeln($sql);
@@ -142,8 +141,7 @@ class EventLogCleanup
 
                 if (true === $operations[self::EMAIL_STATS_TOKENS]) {
                     $sql = 'UPDATE '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
-                }
-                else {
+                } else {
                     $sql = 'DELETE '.$this->dbPrefix.$operation.' FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
                 }
 
@@ -185,6 +183,7 @@ class EventLogCleanup
         } else {
             $message .= $dryRun ? $this->dryRunMessage : $this->runMessage;
         }
+
         return $message;
     }
 }

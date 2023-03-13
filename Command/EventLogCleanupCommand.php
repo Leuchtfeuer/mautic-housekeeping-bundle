@@ -29,7 +29,7 @@ class EventLogCleanupCommand extends Command
     protected function configure(): void
     {
         $this->setName(self::$defaultName)
-            ->setDescription('EventLog Cleanup Command')
+            ->setDescription('Database Cleanup Command to delete lead_event_log table entries, campaign_lead_event_log table entries, email_stats table entries where the referenced email entry is currently not published and email_stats_devices table entries.')
             ->setDefinition(
                 [
                     new InputOption(
@@ -86,15 +86,15 @@ class EventLogCleanupCommand extends Command
             EventLogCleanup::CAMPAIGN_LEAD_EVENTS => $input->getOption('campaign-lead'),
             EventLogCleanup::LEAD_EVENTS          => $input->getOption('lead'),
             EventLogCleanup::EMAIL_STATS          => $input->getOption('email-stats'),
-            EventLogCleanup::EMAIL_STATS_TOKENS   => $input->getOption('email-stats-tokens')
+            EventLogCleanup::EMAIL_STATS_TOKENS   => $input->getOption('email-stats-tokens'),
         ];
 
         if (0 === array_sum($operations)) {
-            $operations = array_combine(array_keys($operations), array_fill(0, count($operations), true));
+            $operations                                      = array_combine(array_keys($operations), array_fill(0, count($operations), true));
             $operations[EventLogCleanup::EMAIL_STATS_TOKENS] = false;
         }
 
-        if (($operations[EventLogCleanup::EMAIL_STATS_TOKENS] === true) && ((($operations[EventLogCleanup::EMAIL_STATS] === true) || ($operations[EventLogCleanup::CAMPAIGN_LEAD_EVENTS] === true)) || ($operations[EventLogCleanup::LEAD_EVENTS] === true))) {
+        if ((true === $operations[EventLogCleanup::EMAIL_STATS_TOKENS]) && (((true === $operations[EventLogCleanup::EMAIL_STATS]) || (true === $operations[EventLogCleanup::CAMPAIGN_LEAD_EVENTS])) || (true === $operations[EventLogCleanup::LEAD_EVENTS]))) {
             $output->writeln('<error>The combination of “-t” flag with either “-m” flag or “-c” flag or “-l” flag is not supported/possible. You can only combine the "-t" flag with "-d" flag and/or "-r" flag.</error>');
 
             return 1;
