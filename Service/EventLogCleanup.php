@@ -32,6 +32,8 @@ class EventLogCleanup
         self::EMAIL_STATS_DEVICES  => self::PREFIX.'email_stats_devices LEFT JOIN '.self::PREFIX.'email_stats ON '.self::PREFIX.'email_stats.id = '.self::PREFIX.'email_stats_devices.stat_id WHERE '.self::PREFIX.'email_stats.id IS NULL OR '.self::PREFIX.'email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
     ];
 
+    private string $queriesTokensDryRun = self::PREFIX.'email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL';
+
     private array $params = [
         self::CAMPAIGN_LEAD_EVENTS => [
             ':daysOld' => self::DEFAULT_DAYS,
@@ -120,7 +122,7 @@ class EventLogCleanup
                 }
 
                 if (true === $operations[self::EMAIL_STATS_TOKENS]) {
-                    $sql                     = 'SELECT * FROM email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL';
+                    $sql                     = 'SELECT * FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queriesTokensDryRun);
                     $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
                     $result[$operation]      = $statement->rowCount();
                 } else {
