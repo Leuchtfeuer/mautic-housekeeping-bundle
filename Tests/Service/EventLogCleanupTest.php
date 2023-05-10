@@ -80,7 +80,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT * FROM prefix_table_email_stats LEFT JOIN emails ON email_stats.email_id = emails.id WHERE is_published = 0 OR email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'SELECT * FROM prefix_table_email_stats LEFT JOIN emails ON prefix_table_email_stats.email_id = emails.id WHERE is_published = 0 OR prefix_table_email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     [':daysOld' => $daysOld],
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
@@ -127,7 +127,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT * FROM prefix_table_email_stats LEFT JOIN emails ON email_stats.email_id = emails.id WHERE is_published = 0 OR email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'SELECT * FROM prefix_table_email_stats LEFT JOIN emails ON prefix_table_email_stats.email_id = emails.id WHERE is_published = 0 OR prefix_table_email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     [':daysOld' => $daysOld],
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
@@ -163,7 +163,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT * FROM prefix_table_email_stats LEFT JOIN emails ON email_stats.email_id = emails.id WHERE is_published = 0 OR email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'SELECT * FROM prefix_table_email_stats LEFT JOIN emails ON prefix_table_email_stats.email_id = emails.id WHERE is_published = 0 OR prefix_table_email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     [':daysOld' => $daysOld],
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
@@ -225,7 +225,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN emails ON email_stats.email_id = emails.id WHERE is_published = 0 OR email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN emails ON prefix_table_email_stats.email_id = emails.id WHERE is_published = 0 OR prefix_table_email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     [':daysOld' => $daysOld],
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
@@ -272,7 +272,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN emails ON email_stats.email_id = emails.id WHERE is_published = 0 OR email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN emails ON prefix_table_email_stats.email_id = emails.id WHERE is_published = 0 OR prefix_table_email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     [':daysOld' => $daysOld],
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
@@ -308,7 +308,7 @@ class EventLogCleanupTest extends TestCase
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN emails ON email_stats.email_id = emails.id WHERE is_published = 0 OR email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN emails ON prefix_table_email_stats.email_id = emails.id WHERE is_published = 0 OR prefix_table_email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     [':daysOld' => $daysOld],
                     [':daysOld' => \PDO::PARAM_INT],
                 ],
