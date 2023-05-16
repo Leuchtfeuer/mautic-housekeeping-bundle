@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MauticPlugin\MauticHousekeepingBundle\Integration;
+namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration;
 
 use Mautic\IntegrationsBundle\Exception\IntegrationNotFoundException;
 use Mautic\IntegrationsBundle\Helper\IntegrationsHelper;
@@ -33,7 +33,7 @@ class Config
      */
     public function getIntegrationEntity(): Integration
     {
-        $integrationObject = $this->integrationsHelper->getIntegration(LeuchtfeuerHousekeepingIntegration::INTEGRATION_NAME);
+        $integrationObject = $this->integrationsHelper->getIntegration(HousekeepingLeuchtfeuerIntegration::INTEGRATION_NAME);
 
         return $integrationObject->getIntegrationConfiguration();
     }

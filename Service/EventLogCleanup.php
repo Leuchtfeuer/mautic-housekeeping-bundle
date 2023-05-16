@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace MauticPlugin\MauticHousekeepingBundle\Service;
+namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Service;
 
 use Doctrine\DBAL\Connection;
 use Symfony\Component\Console\Output\OutputInterface;
-use MauticPlugin\MauticHousekeepingBundle\Integration\Config;
+use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config;
 
 class EventLogCleanup
 {

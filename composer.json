@@ -1,5 +1,5 @@
 {
-    "name": "leuchtfeuer/mautic-housekeeping-bundle",
+    "name": "leuchtfeuer/leuchtfeuer-housekeeping-bundle",
     "type": "mautic-plugin",
     "license": "GPL-3.0-or-later",
     "authors": [
@@ -16,7 +16,7 @@
         "mautic/core-lib": "^3.0|^4.0"
     },
     "extra": {
-        "install-directory-name": "MauticHousekeepingBundle"
+        "install-directory-name": "LeuchtfeuerHousekeepingBundle"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.4",

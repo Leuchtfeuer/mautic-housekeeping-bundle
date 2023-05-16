@@ -7,15 +7,15 @@ return [
     'author'      => 'Leuchtfeuer Digital Marketing GmbH',
     'services'    => [
         'integrations' => [
-            'mautic.integration.leuchtfeuerhousekeeping' => [
-                'class' => \MauticPlugin\MauticHousekeepingBundle\Integration\LeuchtfeuerHousekeepingIntegration::class,
+            'mautic.integration.housekeepingleuchtfeuer' => [
+                'class' => \MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\HousekeepingLeuchtfeuerIntegration::class,
                 'tags'  => [
                     'mautic.integration',
                     'mautic.basic_integration',
                 ],
             ],
-            'leuchtfeuerhousekeeping.integration.configuration' => [
-                 'class' => \MauticPlugin\MauticHousekeepingBundle\Integration\Support\ConfigSupport::class,
+            'housekeepingleuchtfeuer.integration.configuration' => [
+                 'class' => \MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Support\ConfigSupport::class,
                 'tags'  => [
                     'mautic.config_integration',
                 ],
@@ -23,7 +23,7 @@ return [
         ],
         'command' => [
             'mautic.leuchtfeuer.command.housekeeping' => [
-                'class'     => \MauticPlugin\MauticHousekeepingBundle\Command\EventLogCleanupCommand::class,
+                'class'     => \MauticPlugin\LeuchtfeuerHousekeepingBundle\Command\EventLogCleanupCommand::class,
                 'tag'       => 'console.command',
                 'arguments' => [
                     'mautic.leuchtfeuer.service.event_log_cleanup',
@@ -35,13 +35,13 @@ return [
         'helpers'      => [],
         'other'  => [
             'mautic.leuchtfeuer.service.event_log_cleanup' => [
-                'class'     => \MauticPlugin\MauticHousekeepingBundle\Service\EventLogCleanup::class,
+                'class'     => \MauticPlugin\LeuchtfeuerHousekeepingBundle\Service\EventLogCleanup::class,
                 'arguments' => ['database_connection',
                                 '%mautic.db_table_prefix%',
-                                'mautic.leuchtfeuerhousekeeping.config'],
+                                'mautic.housekeepingleuchtfeuer.config'],
             ],
-            'mautic.leuchtfeuerhousekeeping.config' => [
-                'class'     => \MauticPlugin\MauticHousekeepingBundle\Integration\Config::class,
+            'mautic.housekeepingleuchtfeuer.config' => [
+                'class'     => \MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config::class,
                 'arguments' => [
                     'mautic.integrations.helper',
                 ],
