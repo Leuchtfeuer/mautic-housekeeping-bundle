@@ -7,7 +7,7 @@ Command to delete lead_event_log table entries, campaign_lead_event_log table en
 Important: If referenced email is ever switched back to published, the contacts will get the email again.
 
 ```
-bin/console mautic:leuchtfeuer:housekeeping
+bin/console Leuchtfeuer:housekeeping
 ```
 By default, entries older than 365 days are deleted from the CampaignLeadEventLog, LeadEventLog, EmailStats (only email_stats entries that referenced emails entry is currently not published) and EmailStatsDevices tables.
 
@@ -23,11 +23,11 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 ```
 
 ### Installation
-- Plugin must be saved under plugins/MauticHousekeepingBundle/
+- Plugin must be saved under plugins/LeuchtfeuerHousekeepingBundle/
 - Afterwards, the cache must be cleared.
 
 ### Notice
-- Every last entry from the campaign_lead_event_log per campaign will be kept. This is due to contacts restarting campaigns if there is no last step preserved in the log. 
+- Every last entry from the campaign_lead_event_log per campaign will be kept. This is due to contacts restarting campaigns if there is no last step preserved in the log.
 
 ### Known issues
 - A `--dry-run` might fail on databases with a huge amount of entries.
