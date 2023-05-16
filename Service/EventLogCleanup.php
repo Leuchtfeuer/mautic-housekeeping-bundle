@@ -6,11 +6,13 @@ namespace MauticPlugin\MauticHousekeepingBundle\Service;
 
 use Doctrine\DBAL\Connection;
 use Symfony\Component\Console\Output\OutputInterface;
+use MauticPlugin\MauticHousekeepingBundle\Integration\Config;
 
 class EventLogCleanup
 {
     private const PREFIX = '%PREFIX%';
 
+    private Config $config;
     private Connection $connection;
     private string $dbPrefix;
 
@@ -76,10 +78,11 @@ class EventLogCleanup
     private string $dryRunMessageTokens = ' will be set to NULL. This is a dry run.';
     private string $runMessageTokens    = ' have been set to NULL.';
 
-    public function __construct(Connection $connection, ?string $dbPrefix)
+    public function __construct(Connection $connection, ?string $dbPrefix, Config $config)
     {
         $this->connection = $connection;
         $this->dbPrefix   = $dbPrefix ?? '';
+        $this->config     = $config;
     }
 
     /**
@@ -87,6 +90,10 @@ class EventLogCleanup
      */
     public function deleteEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, array $operations, OutputInterface $output): string
     {
+        if (!$this->config->isPublished()) {
+            return 'Housekeeping by Leuchtfeuer is not enabled. Enable it in plugins in mautic user interface, if you want to use it.';
+        }
+
         if (self::DEFAULT_DAYS !== $daysOld) {
             foreach ($this->params as $index => $item) {
                 $this->params[$index][':daysOld'] = $daysOld;
