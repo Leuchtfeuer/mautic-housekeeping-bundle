@@ -7,7 +7,7 @@ Command to delete lead_event_log table entries, campaign_lead_event_log table en
 Important: If referenced email is ever switched back to published, the contacts will get the email again.
 
 ```
-bin/console Leuchtfeuer:housekeeping
+bin/console leuchtfeuer:housekeeping
 ```
 By default, entries older than 365 days are deleted from the CampaignLeadEventLog, LeadEventLog, EmailStats (only email_stats entries that referenced emails entry is currently not published) and EmailStatsDevices tables.
 

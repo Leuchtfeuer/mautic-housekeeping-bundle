@@ -13,7 +13,7 @@ use Throwable;
 
 class EventLogCleanupCommand extends Command
 {
-    protected static $defaultName = 'Leuchtfeuer:housekeeping';
+    protected static $defaultName = 'leuchtfeuer:housekeeping';
 
     private const DEFAULT_DAYS = 365;
 
