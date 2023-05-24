@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace MauticPlugin\MauticHousekeepingBundle\Tests\Service;
+namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Tests\Service;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Driver\Result;
 use Generator;
-use MauticPlugin\MauticHousekeepingBundle\Service\EventLogCleanup;
+use MauticPlugin\LeuchtfeuerHousekeepingBundle\Service\EventLogCleanup;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Output\OutputInterface;
 

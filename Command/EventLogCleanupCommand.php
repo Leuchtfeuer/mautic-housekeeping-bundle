@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MauticPlugin\MauticHousekeepingBundle\Command;
+namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Command;
 
-use MauticPlugin\MauticHousekeepingBundle\Service\EventLogCleanup;
+use MauticPlugin\LeuchtfeuerHousekeepingBundle\Service\EventLogCleanup;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -13,7 +13,7 @@ use Throwable;
 
 class EventLogCleanupCommand extends Command
 {
-    protected static $defaultName = 'mautic:leuchtfeuer:housekeeping';
+    protected static $defaultName = 'leuchtfeuer:housekeeping';
 
     private const DEFAULT_DAYS = 365;
 
@@ -52,27 +52,27 @@ class EventLogCleanupCommand extends Command
                 The <info>%command.name%</info> command is used to clean up the campaign_lead_event_log table, the lead_event_log table, the email_stats table (but only email_stats entries where the referenced email entry is currently not published) and the email_stats_devices table or just clean up the field tokens in email_stats if the option flag "-t" is set.
 
                 <info>php %command.full_name%</info>
-                
+
                 Specify the number of days old data should be before purging:
                 <info>php %command.full_name% --days-old=365</info>
-                
+
                 You can also optionally specify a dry run without deleting any records:
                 <info>php %command.full_name% --days-old=365 --dry-run</info>
-                
+
                 You can also optionally specify for which campaign the entries should be purged from campaign_lead_event_log:
-                <info>php %command.full_name% --cmp-id=123</info> 
-                
+                <info>php %command.full_name% --cmp-id=123</info>
+
                 Purge only campaign_lead_event_log records:
-                <info>php %command.full_name% --campaign-lead </info> 
-                
+                <info>php %command.full_name% --campaign-lead </info>
+
                 Purge only lead_event_log records
-                <info>php %command.full_name% --lead</info> 
-                
+                <info>php %command.full_name% --lead</info>
+
                 Purge only email_stats where the referenced email entry is currently not published and email_stats_devices records [Important: If referenced email is ever switched back to published, the contacts will get the email again]:
                 <info>php %command.full_name% --email-stats</info>
-                
+
                 Set tokens field in email_stats to NULL:
-                <info>php %command.full_name% --email-stats-tokens</info> 
+                <info>php %command.full_name% --email-stats-tokens</info>
                 EOT
             );
     }
