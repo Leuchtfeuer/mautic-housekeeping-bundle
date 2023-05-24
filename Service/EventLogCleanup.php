@@ -91,7 +91,7 @@ class EventLogCleanup
     public function deleteEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, array $operations, OutputInterface $output): string
     {
         if (!$this->config->isPublished()) {
-            return 'Housekeeping by Leuchtfeuer is not enabled. Enable it in plugins in mautic user interface, if you want to use it.';
+            return 'Housekeeping by Leuchtfeuer is currently not enabled. To use it, please enable the plugin in your Mautic plugin management.';
         }
 
         if (self::DEFAULT_DAYS !== $daysOld) {
