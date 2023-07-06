@@ -13,7 +13,7 @@
     "require": {
         "php": "^8.0.2",
         "ext-pdo": "*",
-        "mautic/core-lib": "^5.0"
+        "mautic/core-lib": "^4.0|^5.0"
     },
     "extra": {
         "install-directory-name": "LeuchtfeuerHousekeepingBundle"
