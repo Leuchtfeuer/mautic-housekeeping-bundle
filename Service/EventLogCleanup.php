@@ -38,37 +38,37 @@ class EventLogCleanup
 
     private array $params = [
         self::CAMPAIGN_LEAD_EVENTS => [
-            ':daysOld' => self::DEFAULT_DAYS,
+            'daysOld' => self::DEFAULT_DAYS,
         ],
         self::LEAD_EVENTS          => [
-            ':daysOld' => self::DEFAULT_DAYS,
+            'daysOld' => self::DEFAULT_DAYS,
         ],
         self::EMAIL_STATS          => [
-            ':daysOld' => self::DEFAULT_DAYS,
+            'daysOld' => self::DEFAULT_DAYS,
         ],
         self::EMAIL_STATS_TOKENS   => [
-            ':daysOld' => self::DEFAULT_DAYS,
+            'daysOld' => self::DEFAULT_DAYS,
         ],
         self::EMAIL_STATS_DEVICES  => [
-            ':daysOld' => self::DEFAULT_DAYS,
+            'daysOld' => self::DEFAULT_DAYS,
         ],
     ];
 
     private array $types = [
         self::CAMPAIGN_LEAD_EVENTS => [
-            ':daysOld' => \PDO::PARAM_INT,
+            'daysOld' => \PDO::PARAM_INT,
         ],
         self::LEAD_EVENTS          => [
-            ':daysOld' => \PDO::PARAM_INT,
+            'daysOld' => \PDO::PARAM_INT,
         ],
         self::EMAIL_STATS          => [
-            ':daysOld' => \PDO::PARAM_INT,
+            'daysOld' => \PDO::PARAM_INT,
         ],
         self::EMAIL_STATS_TOKENS   => [
-            ':daysOld' => \PDO::PARAM_INT,
+            'daysOld' => \PDO::PARAM_INT,
         ],
         self::EMAIL_STATS_DEVICES  => [
-            ':daysOld' => \PDO::PARAM_INT,
+            'daysOld' => \PDO::PARAM_INT,
         ],
     ];
 
@@ -96,7 +96,7 @@ class EventLogCleanup
 
         if (self::DEFAULT_DAYS !== $daysOld) {
             foreach ($this->params as $index => $item) {
-                $this->params[$index][':daysOld'] = $daysOld;
+                $this->params[$index]['daysOld'] = $daysOld;
             }
         }
 
