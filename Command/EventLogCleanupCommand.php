@@ -45,6 +45,7 @@ class EventLogCleanupCommand extends Command
                     new InputOption('email-stats', 'm', InputOption::VALUE_NONE, 'Purge only Email Stats Records where the referenced email entry is currently not published and purge Email Stats Devices. Important: If referenced email is ever switched back to published, the contacts will get the email again.'),
                     new InputOption('email-stats-tokens', 't', InputOption::VALUE_NONE, 'Set only tokens fields in Email Stats Records to NULL. Important: This option can not be combined with any "-c", "-l" or "-m" flag in one command. And: If the option flag "-t" is not set, the NULL setting of tokens will not be done with the basis command, so if you just run mautic:leuchtfeuer:housekeeping without a flag)'),
                     new InputOption('cmp-id', 'i', InputOption::VALUE_OPTIONAL, 'Delete only campaign_lead_eventLog for a specific CampaignID', 'none'),
+                    new InputOption('limit', 'b', InputOption::VALUE_OPTIONAL, 'Limit the number of rows to delete', 100000)
                 ]
             )
             ->setHelp(
@@ -73,6 +74,9 @@ class EventLogCleanupCommand extends Command
 
                 Set tokens field in email_stats to NULL:
                 <info>php %command.full_name% --email-stats-tokens</info>
+
+                Limit the number of rows to delete
+                <info>php %command.full_name% --limit=100000</info>
                 EOT
             );
     }
@@ -80,6 +84,7 @@ class EventLogCleanupCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $daysOld                              = (int) $input->getOption('days-old');
+        $limit                                = (int) $input->getOption('limit');
         $dryRun                               = $input->getOption('dry-run');
         $campaignId                           = 'none' === $input->getOption('cmp-id') ? null : (int) $input->getOption('cmp-id');
         $operations                           = [
@@ -103,6 +108,7 @@ class EventLogCleanupCommand extends Command
         try {
             $message = $this->eventLogCleanup->deleteEventLogEntries(
                 $daysOld,
+                $limit,
                 $campaignId,
                 $dryRun,
                 $operations,

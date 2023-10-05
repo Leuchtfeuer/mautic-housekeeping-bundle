@@ -16,22 +16,23 @@ class EventLogCleanup
     private Connection $connection;
     private string $dbPrefix;
 
-    public const DEFAULT_DAYS         = 365;
-    public const CAMPAIGN_LEAD_EVENTS = 'campaign_lead_event_log';
-    public const LEAD_EVENTS          = 'lead_event_log';
-    public const EMAIL_STATS          = 'email_stats';
-    public const EMAIL_STATS_TOKENS   = 'email_stats_tokens';
-    private const EMAIL_STATS_DEVICES = 'email_stats_devices';
+    public const    DEFAULT_DAYS            = 365;
+    public const    DEFAULT_LIMIT           = 100000;
+    public const    CAMPAIGN_LEAD_EVENTS    = 'campaign_lead_event_log';
+    public const    LEAD_EVENTS             = 'lead_event_log';
+    public const    EMAIL_STATS             = 'email_stats';
+    public const    EMAIL_STATS_TOKENS      = 'email_stats_tokens';
+    private const   EMAIL_STATS_DEVICES     = 'email_stats_devices';
 
     /**
      * @var array<string, string>
      */
     private array $queries = [
         self::CAMPAIGN_LEAD_EVENTS => self::PREFIX.'campaign_lead_event_log WHERE ('.self::PREFIX.'campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM '.self::PREFIX.'campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND '.self::PREFIX.'campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
-        self::LEAD_EVENTS          => self::PREFIX.'lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-        self::EMAIL_STATS          => self::PREFIX.'email_stats LEFT JOIN '.self::PREFIX.'emails ON '.self::PREFIX.'email_stats.email_id = '.self::PREFIX.'emails.id WHERE is_published = 0 OR '.self::PREFIX.'email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-        self::EMAIL_STATS_TOKENS   => self::PREFIX.'email_stats SET tokens = NULL WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL',
-        self::EMAIL_STATS_DEVICES  => self::PREFIX.'email_stats_devices LEFT JOIN '.self::PREFIX.'email_stats ON '.self::PREFIX.'email_stats.id = '.self::PREFIX.'email_stats_devices.stat_id WHERE '.self::PREFIX.'email_stats.id IS NULL OR '.self::PREFIX.'email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+        self::LEAD_EVENTS          => self::PREFIX.'lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) ORDER BY id DESC LIMIT :limit',
+        self::EMAIL_STATS          => self::PREFIX.'email_stats WHERE EXISTS (SELECT id FROM '.self::PREFIX.'emails WHERE '.self::PREFIX.'email_stats.email_id = '.self::PREFIX.'emails.id AND '.self::PREFIX.'emails.is_published = 0 OR '.self::PREFIX.'email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) ORDER BY id DESC LIMIT :limit',
+        self::EMAIL_STATS_TOKENS   => self::PREFIX.'email_stats SET tokens = NULL WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL ORDER BY id DESC LIMIT :limit',
+        self::EMAIL_STATS_DEVICES  => self::PREFIX.'email_stats_devices WHERE EXISTS (SELECT id FROM '.self::PREFIX.'email_stats WHERE '.self::PREFIX.'email_stats.id = '.self::PREFIX.'email_stats_devices.stat_id AND '.self::PREFIX.'email_stats.id IS NULL OR '.self::PREFIX.'email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) ORDER BY id DESC LIMIT :limit',
     ];
 
     private string $queriesTokensDryRun = self::PREFIX.'email_stats WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL';
@@ -39,36 +40,46 @@ class EventLogCleanup
     private array $params = [
         self::CAMPAIGN_LEAD_EVENTS => [
             'daysOld' => self::DEFAULT_DAYS,
+            'limit'   => self::DEFAULT_LIMIT,
         ],
         self::LEAD_EVENTS          => [
             'daysOld' => self::DEFAULT_DAYS,
+            'limit'   => self::DEFAULT_LIMIT,
         ],
         self::EMAIL_STATS          => [
             'daysOld' => self::DEFAULT_DAYS,
+            'limit'   => self::DEFAULT_LIMIT,
         ],
         self::EMAIL_STATS_TOKENS   => [
             'daysOld' => self::DEFAULT_DAYS,
+            'limit'   => self::DEFAULT_LIMIT,
         ],
         self::EMAIL_STATS_DEVICES  => [
             'daysOld' => self::DEFAULT_DAYS,
+            'limit'   => self::DEFAULT_LIMIT,
         ],
     ];
 
     private array $types = [
         self::CAMPAIGN_LEAD_EVENTS => [
             'daysOld' => \PDO::PARAM_INT,
+            'limit'   => \PDO::PARAM_INT,
         ],
         self::LEAD_EVENTS          => [
             'daysOld' => \PDO::PARAM_INT,
+            'limit'   => \PDO::PARAM_INT,
         ],
         self::EMAIL_STATS          => [
             'daysOld' => \PDO::PARAM_INT,
+            'limit'   => \PDO::PARAM_INT,
         ],
         self::EMAIL_STATS_TOKENS   => [
             'daysOld' => \PDO::PARAM_INT,
+            'limit'   => \PDO::PARAM_INT,
         ],
         self::EMAIL_STATS_DEVICES  => [
             'daysOld' => \PDO::PARAM_INT,
+            'limit'   => \PDO::PARAM_INT,
         ],
     ];
 
@@ -88,7 +99,7 @@ class EventLogCleanup
     /**
      * @param non-empty-array<string, bool> $operations
      */
-    public function deleteEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, array $operations, OutputInterface $output): string
+    public function deleteEventLogEntries(int $daysOld, int $limit, ?int $campaignId, bool $dryRun, array $operations, OutputInterface $output): string
     {
         if (!$this->config->isPublished()) {
             return 'Housekeeping by Leuchtfeuer is currently not enabled. To use it, please enable the plugin in your Mautic plugin management.';
@@ -97,6 +108,12 @@ class EventLogCleanup
         if (self::DEFAULT_DAYS !== $daysOld) {
             foreach ($this->params as $index => $item) {
                 $this->params[$index]['daysOld'] = $daysOld;
+            }
+        }
+
+        if (self::DEFAULT_LIMIT !== $limit) {
+            foreach ($this->params as $index => $item) {
+                $this->params[$index]['limit'] = $limit;
             }
         }
 
@@ -151,7 +168,7 @@ class EventLogCleanup
                 if (true === $operations[self::EMAIL_STATS_TOKENS]) {
                     $sql = 'UPDATE '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
                 } else {
-                    $sql = 'DELETE '.$this->dbPrefix.$operation.' FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
+                    $sql = 'DELETE FROM '.str_replace(self::PREFIX, $this->dbPrefix, $this->queries[$operation]);
                 }
 
                 $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
