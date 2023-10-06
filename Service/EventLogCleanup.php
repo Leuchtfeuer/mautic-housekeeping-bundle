@@ -28,9 +28,9 @@ class EventLogCleanup
      * @var array<string, string>
      */
     private array $queries = [
-        self::CAMPAIGN_LEAD_EVENTS => self::PREFIX.'campaign_lead_event_log WHERE ('.self::PREFIX.'campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM '.self::PREFIX.'campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND '.self::PREFIX.'campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
+        self::CAMPAIGN_LEAD_EVENTS => self::PREFIX.'campaign_lead_event_log WHERE ('.self::PREFIX.'campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM '.self::PREFIX.'campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND '.self::PREFIX.'campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) ORDER BY id DESC LIMIT :limit',
         self::LEAD_EVENTS          => self::PREFIX.'lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY) ORDER BY id DESC LIMIT :limit',
-        self::EMAIL_STATS          => self::PREFIX.'email_stats WHERE EXISTS (SELECT id FROM '.self::PREFIX.'emails WHERE '.self::PREFIX.'email_stats.email_id = '.self::PREFIX.'emails.id AND '.self::PREFIX.'emails.is_published = 0 OR '.self::PREFIX.'email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) ORDER BY id DESC LIMIT :limit',
+        self::EMAIL_STATS          => self::PREFIX.'email_stats WHERE EXISTS (SELECT id FROM '.self::PREFIX.'emails WHERE '.self::PREFIX.'email_stats.email_id = '.self::PREFIX.'emails.id AND '.self::PREFIX.'emails.is_published = 0 OR ('.self::PREFIX.'emails.publish_down > NULL AND '.self::PREFIX.'emails.publish_down < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) OR '.self::PREFIX.'email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) ORDER BY id DESC LIMIT :limit',
         self::EMAIL_STATS_TOKENS   => self::PREFIX.'email_stats SET tokens = NULL WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL ORDER BY id DESC LIMIT :limit',
         self::EMAIL_STATS_DEVICES  => self::PREFIX.'email_stats_devices WHERE EXISTS (SELECT id FROM '.self::PREFIX.'email_stats WHERE '.self::PREFIX.'email_stats.id = '.self::PREFIX.'email_stats_devices.stat_id AND '.self::PREFIX.'email_stats.id IS NULL OR '.self::PREFIX.'email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) ORDER BY id DESC LIMIT :limit',
     ];
@@ -173,6 +173,10 @@ class EventLogCleanup
 
                 $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
                 $result[$operation]      = $statement->rowCount();
+
+                if ($result[$operation] > 0) {
+                    $this->deleteEventLogEntries($daysOld, $limit, $campaignId, false, $operations, $output);
+                }
 
                 if ($output->isVerbose()) {
                     $output->writeln($sql);
