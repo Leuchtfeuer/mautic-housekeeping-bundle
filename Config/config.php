@@ -27,6 +27,7 @@ return [
                 'tag'       => 'console.command',
                 'arguments' => [
                     'mautic.leuchtfeuer.service.event_log_cleanup',
+                    'mautic.housekeepingleuchtfeuer.config',
                 ],
             ],
         ],

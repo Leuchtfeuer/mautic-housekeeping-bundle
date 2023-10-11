@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Command;
 
+use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config;
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Service\EventLogCleanup;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -13,15 +14,24 @@ use Throwable;
 
 class EventLogCleanupCommand extends Command
 {
+    public const    EMAIL_STATS_TOKENS      = 'email_stats_tokens';
+
+    private Config $config;
+    private string $dryRunMessage = ' rows would have been deleted. This is a dry run.';
+    private string $runMessage    = ' rows have been deleted in this turn.';
+    private string $dryRunMessageTokens = ' will be set to NULL. This is a dry run.';
+    private string $runMessageTokens    = ' have been set to NULL in this turn.';
+
     protected static $defaultName = 'leuchtfeuer:housekeeping';
 
     private const DEFAULT_DAYS = 365;
 
     private EventLogCleanup $eventLogCleanup;
 
-    public function __construct(EventLogCleanup $eventLogCleanup)
+    public function __construct(EventLogCleanup $eventLogCleanup, Config $config)
     {
         $this->eventLogCleanup = $eventLogCleanup;
+        $this->config          = $config;
 
         parent::__construct(null);
     }
@@ -83,6 +93,12 @@ class EventLogCleanupCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        if (!$this->config->isPublished()) {
+            $message = 'Housekeeping by Leuchtfeuer is currently not enabled. To use it, please enable the plugin in your Mautic plugin management.';
+            $output->writeln('<info>'.$message.'<info>');
+            return 1;
+        }
+
         $daysOld                              = (int) $input->getOption('days-old');
         $limit                                = (int) $input->getOption('limit');
         $dryRun                               = $input->getOption('dry-run');
@@ -93,6 +109,8 @@ class EventLogCleanupCommand extends Command
             EventLogCleanup::EMAIL_STATS          => $input->getOption('email-stats'),
             EventLogCleanup::EMAIL_STATS_TOKENS   => $input->getOption('email-stats-tokens'),
         ];
+        $finished = false;
+        $message = 'Nothing to delete.';
 
         if (0 === array_sum($operations)) {
             $operations                                      = array_combine(array_keys($operations), array_fill(0, count($operations), true));
@@ -101,12 +119,11 @@ class EventLogCleanupCommand extends Command
 
         if ((true === $operations[EventLogCleanup::EMAIL_STATS_TOKENS]) && (((true === $operations[EventLogCleanup::EMAIL_STATS]) || (true === $operations[EventLogCleanup::CAMPAIGN_LEAD_EVENTS])) || (true === $operations[EventLogCleanup::LEAD_EVENTS]))) {
             $output->writeln('<error>The combination of “-t” flag with either “-m” flag or “-c” flag or “-l” flag is not supported/possible. You can only combine the "-t" flag with "-d" flag and/or "-r" flag.</error>');
-
             return 1;
         }
 
         try {
-            $message = $this->eventLogCleanup->deleteEventLogEntries(
+            $result = $this->eventLogCleanup->deleteEventLogEntries(
                 $daysOld,
                 $limit,
                 $campaignId,
@@ -116,8 +133,42 @@ class EventLogCleanupCommand extends Command
             );
         } catch (Throwable $e) {
             $output->writeln(sprintf('<error>Deletion of Log Rows failed because of database error: %s</error>', $e->getMessage()));
-
             return 1;
+        }
+
+        while (0 < array_sum($result)) {
+            $message       = '';
+            $lastOperation = array_key_last($operations);
+            foreach ($operations as $operation => $enabled) {
+                if (false === $enabled) {
+                    continue;
+                }
+
+                if ('' !== $message) {
+                    if ($lastOperation === $operation) {
+                        $message .= ' and ';
+                    } else {
+                        $message .= ', ';
+                    }
+                }
+
+                $message .= $result[$operation].' '.$operation;
+            }
+            if (true === $operations[self::EMAIL_STATS_TOKENS]) {
+                $message .= $dryRun ? $this->dryRunMessageTokens : $this->runMessageTokens;
+            } else {
+                $message .= $dryRun ? $this->dryRunMessage : $this->runMessage;
+            }
+
+            $output->writeln('<info>'.$message.'<info>');
+            $result = $this->eventLogCleanup->deleteEventLogEntries($daysOld, $limit, $campaignId, false, $operations, $output);
+            $finished = true;
+        }
+
+        if (true === $finished) {
+            $message = 'Deletion complete.';
+            $output->writeln('<info>'.$message.'<info>');
+            return 0;
         }
 
         $output->writeln('<info>'.$message.'<info>');

@@ -83,12 +83,6 @@ class EventLogCleanup
         ],
     ];
 
-    private string $dryRunMessage = ' rows would have been deleted. This is a dry run.';
-    private string $runMessage    = ' rows have been deleted.';
-
-    private string $dryRunMessageTokens = ' will be set to NULL. This is a dry run.';
-    private string $runMessageTokens    = ' have been set to NULL.';
-
     public function __construct(Connection $connection, ?string $dbPrefix, Config $config)
     {
         $this->connection = $connection;
@@ -99,12 +93,8 @@ class EventLogCleanup
     /**
      * @param non-empty-array<string, bool> $operations
      */
-    public function deleteEventLogEntries(int $daysOld, int $limit, ?int $campaignId, bool $dryRun, array $operations, OutputInterface $output): string
+    public function deleteEventLogEntries(int $daysOld, int $limit, ?int $campaignId, bool $dryRun, array $operations, OutputInterface $output): array
     {
-        if (!$this->config->isPublished()) {
-            return 'Housekeeping by Leuchtfeuer is currently not enabled. To use it, please enable the plugin in your Mautic plugin management.';
-        }
-
         if (self::DEFAULT_DAYS !== $daysOld) {
             foreach ($this->params as $index => $item) {
                 $this->params[$index]['daysOld'] = $daysOld;
@@ -174,10 +164,6 @@ class EventLogCleanup
                 $statement               = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
                 $result[$operation]      = $statement->rowCount();
 
-                if ($result[$operation] > 0) {
-                    $this->deleteEventLogEntries($daysOld, $limit, $campaignId, false, $operations, $output);
-                }
-
                 if ($output->isVerbose()) {
                     $output->writeln($sql);
                 }
@@ -191,29 +177,6 @@ class EventLogCleanup
             throw $throwable;
         }
 
-        $message       = '';
-        $lastOperation = array_key_last($operations);
-        foreach ($operations as $operation => $enabled) {
-            if (false === $enabled) {
-                continue;
-            }
-
-            if ('' !== $message) {
-                if ($lastOperation === $operation) {
-                    $message .= ' and ';
-                } else {
-                    $message .= ', ';
-                }
-            }
-
-            $message .= $result[$operation].' '.$operation;
-        }
-        if (true === $operations[self::EMAIL_STATS_TOKENS]) {
-            $message .= $dryRun ? $this->dryRunMessageTokens : $this->runMessageTokens;
-        } else {
-            $message .= $dryRun ? $this->dryRunMessage : $this->runMessage;
-        }
-
-        return $message;
+        return $result;
     }
 }
