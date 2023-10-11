@@ -13,7 +13,7 @@ class HousekeepingLeuchtfeuerIntegration extends BasicIntegration implements Bas
     use ConfigurationTrait;
 
     public const INTEGRATION_NAME = 'housekeepingleuchtfeuer';
-    public const DISPLAY_NAME     = 'Housekeeping';
+    public const DISPLAY_NAME     = 'Housekeeping by Leuchtfeuer';
 
     public function getName(): string
     {
