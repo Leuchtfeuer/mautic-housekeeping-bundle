@@ -136,7 +136,35 @@ class EventLogCleanupCommand extends Command
             return 1;
         }
 
-        while (0 < array_sum($result)) {
+        if (true === $dryRun) {
+            $message       = '';
+            $lastOperation = array_key_last($operations);
+            foreach ($operations as $operation => $enabled) {
+                if (false === $enabled) {
+                    continue;
+                }
+
+                if ('' !== $message) {
+                    if ($lastOperation === $operation) {
+                        $message .= ' and ';
+                    } else {
+                        $message .= ', ';
+                    }
+                }
+
+                $message .= $result[$operation].' '.$operation;
+            }
+
+            if (true === $operations[self::EMAIL_STATS_TOKENS]) {
+                $message .= $this->dryRunMessageTokens;
+            } else {
+                $message .= $this->dryRunMessage;
+            }
+            $output->writeln('<info>'.$message.'<info>');
+            return 0;
+        }
+
+        while (0 < array_sum($result) && false === $dryRun) {
             $message       = '';
             $lastOperation = array_key_last($operations);
             foreach ($operations as $operation => $enabled) {
@@ -155,9 +183,9 @@ class EventLogCleanupCommand extends Command
                 $message .= $result[$operation].' '.$operation;
             }
             if (true === $operations[self::EMAIL_STATS_TOKENS]) {
-                $message .= $dryRun ? $this->dryRunMessageTokens : $this->runMessageTokens;
+                $message .= $this->runMessageTokens;
             } else {
-                $message .= $dryRun ? $this->dryRunMessage : $this->runMessage;
+                $message .= $this->runMessage;
             }
 
             $output->writeln('<info>'.$message.'<info>');
@@ -167,18 +195,6 @@ class EventLogCleanupCommand extends Command
 
         if (true === $finished && false === $dryRun) {
             $message = 'Deletion complete.';
-            $output->writeln('<info>'.$message.'<info>');
-            return 0;
-        }
-
-        if (true === $finished && true === $dryRun) {
-            $message = 'Dry run finished.';
-            $output->writeln('<info>'.$message.'<info>');
-            return 0;
-        }
-
-        if (false === $finished && true === $dryRun) {
-            $message = 'Nothing would be deleted. This is a dry run.';
             $output->writeln('<info>'.$message.'<info>');
             return 0;
         }
