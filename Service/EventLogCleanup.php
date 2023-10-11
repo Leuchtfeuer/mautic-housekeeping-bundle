@@ -6,13 +6,11 @@ namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Service;
 
 use Doctrine\DBAL\Connection;
 use Symfony\Component\Console\Output\OutputInterface;
-use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config;
 
 class EventLogCleanup
 {
     private const PREFIX = '%PREFIX%';
 
-    private Config $config;
     private Connection $connection;
     private string $dbPrefix;
 
@@ -90,11 +88,10 @@ class EventLogCleanup
         ],
     ];
 
-    public function __construct(Connection $connection, ?string $dbPrefix, Config $config)
+    public function __construct(Connection $connection, ?string $dbPrefix)
     {
         $this->connection = $connection;
         $this->dbPrefix   = $dbPrefix ?? '';
-        $this->config     = $config;
     }
 
     /**

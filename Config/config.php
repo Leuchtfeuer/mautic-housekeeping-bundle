@@ -39,7 +39,7 @@ return [
                 'class'     => \MauticPlugin\LeuchtfeuerHousekeepingBundle\Service\EventLogCleanup::class,
                 'arguments' => ['database_connection',
                                 '%mautic.db_table_prefix%',
-                                'mautic.housekeepingleuchtfeuer.config'],
+                ],
             ],
             'mautic.housekeepingleuchtfeuer.config' => [
                 'class'     => \MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config::class,
