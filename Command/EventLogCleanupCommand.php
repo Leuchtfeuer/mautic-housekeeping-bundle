@@ -17,9 +17,9 @@ class EventLogCleanupCommand extends Command
     public const    EMAIL_STATS_TOKENS      = 'email_stats_tokens';
 
     private Config $config;
-    private string $dryRunMessage = ' rows would have been deleted. This is a dry run.';
+    private string $dryRunMessage = ' rows would have been deleted in this turn. This is a dry run.';
     private string $runMessage    = ' rows have been deleted in this turn.';
-    private string $dryRunMessageTokens = ' will be set to NULL. This is a dry run.';
+    private string $dryRunMessageTokens = ' will be set to NULL in this turn. This is a dry run.';
     private string $runMessageTokens    = ' have been set to NULL in this turn.';
 
     protected static $defaultName = 'leuchtfeuer:housekeeping';
@@ -165,8 +165,20 @@ class EventLogCleanupCommand extends Command
             $finished = true;
         }
 
-        if (true === $finished) {
+        if (true === $finished && false === $dryRun) {
             $message = 'Deletion complete.';
+            $output->writeln('<info>'.$message.'<info>');
+            return 0;
+        }
+
+        if (true === $finished && true === $dryRun) {
+            $message = 'Dry run finished.';
+            $output->writeln('<info>'.$message.'<info>');
+            return 0;
+        }
+
+        if (false === $finished && true === $dryRun) {
+            $message = 'Nothing would be deleted. This is a dry run.';
             $output->writeln('<info>'.$message.'<info>');
             return 0;
         }
