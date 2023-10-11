@@ -1,5 +1,6 @@
 {
     "name": "leuchtfeuer/leuchtfeuer-housekeeping-bundle",
+	"description": "A plugin that provides a command to clean up old data.",
     "type": "mautic-plugin",
     "license": "GPL-3.0-or-later",
     "authors": [

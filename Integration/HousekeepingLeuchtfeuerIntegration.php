@@ -27,6 +27,6 @@ class HousekeepingLeuchtfeuerIntegration extends BasicIntegration implements Bas
 
     public function getIcon(): string
     {
-        return 'plugins/LeuchtfeuerHousekeepingBundle/Assets/img/icon.png';
+        return 'plugins/LeuchtfeuerHousekeepingBundle/Assets/img/Leuchtfeuer-mautic-housekeeping.png';
     }
 }
