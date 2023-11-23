@@ -3,7 +3,7 @@
 return [
     'name'        => 'Housekeeping by Leuchtfeuer',
     'description' => 'Database Cleanup Command to delete lead_event_log table entries, campaign_lead_event_log table entries, email_stats table entries where the referenced email entry is currently not published and email_stats_devices table entries.',
-    'version'     => '3.0.0',
+    'version'     => '3.1.0',
     'author'      => 'Leuchtfeuer Digital Marketing GmbH',
     'services'    => [
         'integrations' => [
@@ -16,7 +16,7 @@ return [
             ],
             'housekeepingleuchtfeuer.integration.configuration' => [
                  'class' => \MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Support\ConfigSupport::class,
-                'tags'  => [
+                'tags'   => [
                     'mautic.config_integration',
                 ],
             ],
@@ -30,15 +30,17 @@ return [
                 ],
             ],
         ],
-        'models'       => [],
-        'forms'        => [],
-        'helpers'      => [],
-        'other'  => [
+        'models'  => [],
+        'forms'   => [],
+        'helpers' => [],
+        'other'   => [
             'mautic.leuchtfeuer.service.event_log_cleanup' => [
                 'class'     => \MauticPlugin\LeuchtfeuerHousekeepingBundle\Service\EventLogCleanup::class,
-                'arguments' => ['database_connection',
-                                '%mautic.db_table_prefix%',
-                                'mautic.housekeepingleuchtfeuer.config'],
+                'arguments' => [
+                    'database_connection',
+                    '%mautic.db_table_prefix%',
+                    'mautic.housekeepingleuchtfeuer.config',
+                ],
             ],
             'mautic.housekeepingleuchtfeuer.config' => [
                 'class'     => \MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config::class,

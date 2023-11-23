@@ -7,6 +7,7 @@ namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Tests\Service;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Driver\Result;
 use Generator;
+use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config;
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Service\EventLogCleanup;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -47,7 +48,11 @@ class EventLogCleanupTest extends TestCase
             ->method('writeln')
             ->withConsecutive(...$loggedQueries);
 
-        $eventLogCleanup = new EventLogCleanup($connection, 'prefix_table_');
+        $config = $this->createMock(Config::class);
+        $config->method('isPublished')
+            ->willReturn(true);
+
+        $eventLogCleanup = new EventLogCleanup($connection, 'prefix_table_', $config);
         self::assertSame($message, $eventLogCleanup->deleteEventLogEntries(4, $campaignId, $dryRun, $operations, $output));
     }
 
@@ -55,44 +60,47 @@ class EventLogCleanupTest extends TestCase
     {
         $daysOld = 4;
 
-        // dry run all tables
-        yield 0 => [
+        yield 'dry run all tables' => [
             [
                 EventLogCleanup::LEAD_EVENTS          => true,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
                 EventLogCleanup::EMAIL_STATS          => true,
-                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => true,
             ],
             [
                 [
                     'SELECT * FROM prefix_table_lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
                     'SELECT * FROM prefix_table_campaign_lead_event_log WHERE (prefix_table_campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM prefix_table_campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND prefix_table_campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
+                ],
+                [
+                    'SELECT * FROM prefix_table_email_stats  WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL',
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
                     'SELECT * FROM prefix_table_email_stats_devices LEFT JOIN prefix_table_email_stats ON prefix_table_email_stats.id = prefix_table_email_stats_devices.stat_id WHERE prefix_table_email_stats.id IS NULL OR prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT * FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE is_published = 0 OR prefix_table_email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    'SELECT * FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE (prefix_table_emails.is_published = 0 OR prefix_table_email_stats.email_id IS NULL) AND prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
             ],
-            [3, 14, 55, 57],
-            '3 lead_event_log, 14 campaign_lead_event_log, 55 email_stats_devices and 57 email_stats rows would have been deleted. This is a dry run.',
+            [3, 14, 23, 55, 57],
+            '3 lead_event_log, 14 campaign_lead_event_log, 55 email_stats_devices and 57 email_stats rows would have been deleted. 23 email_stats_tokens will be set to NULL. This is a dry run.',
             true,
             null,
         ];
 
-        // dry run email_stats and see email_stats_devices is also cleared
-        yield 1 => [
+        yield 'dry run email_stats and see email_stats_devices is also cleared' => [
             [
                 EventLogCleanup::LEAD_EVENTS          => true,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => false,
@@ -102,8 +110,8 @@ class EventLogCleanupTest extends TestCase
             [
                 [
                     'SELECT * FROM prefix_table_lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
             ],
             [31],
@@ -112,8 +120,7 @@ class EventLogCleanupTest extends TestCase
             null,
         ];
 
-        // dry run single table
-        yield 2 => [
+        yield 'dry run single table' => [
             [
                 EventLogCleanup::LEAD_EVENTS          => false,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => false,
@@ -123,13 +130,13 @@ class EventLogCleanupTest extends TestCase
             [
                 [
                     'SELECT * FROM prefix_table_email_stats_devices LEFT JOIN prefix_table_email_stats ON prefix_table_email_stats.id = prefix_table_email_stats_devices.stat_id WHERE prefix_table_email_stats.id IS NULL OR prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT * FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE is_published = 0 OR prefix_table_email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    'SELECT * FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE (prefix_table_emails.is_published = 0 OR prefix_table_email_stats.email_id IS NULL) AND prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
             ],
             [42, 67],
@@ -138,44 +145,47 @@ class EventLogCleanupTest extends TestCase
             null,
         ];
 
-        // dry run all tables with campaignId
-        yield 3 => [
+        yield 'dry run all tables with campaignId' => [
             [
                 EventLogCleanup::EMAIL_STATS          => true,
                 EventLogCleanup::LEAD_EVENTS          => true,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
-                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => true,
             ],
             [
                 [
                     'SELECT * FROM prefix_table_lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
                     'SELECT * FROM prefix_table_campaign_lead_event_log WHERE (prefix_table_campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM prefix_table_campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND prefix_table_campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) AND campaign_id = :cmpId',
-                    [':daysOld' => $daysOld, ':cmpId' => 12235],
-                    [':daysOld' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld, ':cmpId' => 12235],
+                    ['daysOld' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
+                ],
+                [
+                    'SELECT * FROM prefix_table_email_stats  WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL',
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
                     'SELECT * FROM prefix_table_email_stats_devices LEFT JOIN prefix_table_email_stats ON prefix_table_email_stats.id = prefix_table_email_stats_devices.stat_id WHERE prefix_table_email_stats.id IS NULL OR prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT * FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE is_published = 0 OR prefix_table_email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    'SELECT * FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE (prefix_table_emails.is_published = 0 OR prefix_table_email_stats.email_id IS NULL) AND prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
             ],
-            [34, 41, 3, 87],
-            '34 lead_event_log, 41 campaign_lead_event_log, 3 email_stats_devices and 87 email_stats rows would have been deleted. This is a dry run.',
+            [34, 41, 11, 3, 87],
+            '34 lead_event_log, 41 campaign_lead_event_log, 3 email_stats_devices and 87 email_stats rows would have been deleted. 11 email_stats_tokens will be set to NULL. This is a dry run.',
             true,
             12235,
         ];
 
-        // dry run two tables with campaignId
-        yield 4 => [
+        yield 'dry run two tables with campaignId' => [
             [
                 EventLogCleanup::EMAIL_STATS          => false,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
@@ -185,59 +195,62 @@ class EventLogCleanupTest extends TestCase
             [
                 [
                     'SELECT * FROM prefix_table_campaign_lead_event_log WHERE (prefix_table_campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM prefix_table_campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND prefix_table_campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) AND campaign_id = :cmpId',
-                    [':daysOld' => $daysOld, ':cmpId' => 65487],
-                    [':daysOld' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld, ':cmpId' => 65487],
+                    ['daysOld' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
                 ],
                 [
                     'SELECT * FROM prefix_table_lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
             ],
             [61, 22],
-            '61 campaign_lead_event_log, 22 lead_event_log rows would have been deleted. This is a dry run.',
+            '61 campaign_lead_event_log and 22 lead_event_log rows would have been deleted. This is a dry run.',
             true,
             65487,
         ];
 
-        // real run all tables
-        yield 5 => [
+        yield 'real run all tables' => [
             [
                 EventLogCleanup::LEAD_EVENTS          => true,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
                 EventLogCleanup::EMAIL_STATS          => true,
-                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => true,
             ],
             [
                 [
                     'DELETE prefix_table_lead_event_log FROM prefix_table_lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
                     'DELETE prefix_table_campaign_lead_event_log FROM prefix_table_campaign_lead_event_log WHERE (prefix_table_campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM prefix_table_campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND prefix_table_campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
+                ],
+                [
+                    'UPDATE prefix_table_email_stats SET tokens = NULL WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL',
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
                     'DELETE prefix_table_email_stats_devices FROM prefix_table_email_stats_devices LEFT JOIN prefix_table_email_stats ON prefix_table_email_stats.id = prefix_table_email_stats_devices.stat_id WHERE prefix_table_email_stats.id IS NULL OR prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE is_published = 0 OR prefix_table_email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE (prefix_table_emails.is_published = 0 OR prefix_table_email_stats.email_id IS NULL) AND prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
             ],
-            [3, 14, 55, 41],
-            '3 lead_event_log, 14 campaign_lead_event_log, 55 email_stats_devices and 41 email_stats rows have been deleted.',
+            [3, 14, 32, 55, 41],
+            '3 lead_event_log, 14 campaign_lead_event_log, 55 email_stats_devices and 41 email_stats rows have been deleted. 32 email_stats_tokens have been set to NULL.',
             false,
             null,
         ];
 
-        // real run single table
-        yield 6 => [
+        yield 'real run single table' => [
             [
                 EventLogCleanup::LEAD_EVENTS          => true,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => false,
@@ -247,8 +260,8 @@ class EventLogCleanupTest extends TestCase
             [
                 [
                     'DELETE prefix_table_lead_event_log FROM prefix_table_lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
             ],
             [42],
@@ -257,8 +270,7 @@ class EventLogCleanupTest extends TestCase
             null,
         ];
 
-        // real run email_stats table to see if email_stats_devices is also cleared
-        yield 7 => [
+        yield 'real run email_stats table to see if email_stats_devices is also cleared' => [
             [
                 EventLogCleanup::LEAD_EVENTS          => false,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => false,
@@ -268,13 +280,13 @@ class EventLogCleanupTest extends TestCase
             [
                 [
                     'DELETE prefix_table_email_stats_devices FROM prefix_table_email_stats_devices LEFT JOIN prefix_table_email_stats ON prefix_table_email_stats.id = prefix_table_email_stats_devices.stat_id WHERE prefix_table_email_stats.id IS NULL OR prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE is_published = 0 OR prefix_table_email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE (prefix_table_emails.is_published = 0 OR prefix_table_email_stats.email_id IS NULL) AND prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
             ],
             [42, 12],
@@ -283,44 +295,47 @@ class EventLogCleanupTest extends TestCase
             null,
         ];
 
-        // real run all tables with campaignId
-        yield 8 => [
+        yield 'real run all tables with campaignId' => [
             [
                 EventLogCleanup::EMAIL_STATS          => true,
                 EventLogCleanup::LEAD_EVENTS          => true,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
-                EventLogCleanup::EMAIL_STATS_TOKENS   => false,
+                EventLogCleanup::EMAIL_STATS_TOKENS   => true,
             ],
             [
                 [
                     'DELETE prefix_table_lead_event_log FROM prefix_table_lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
                     'DELETE prefix_table_campaign_lead_event_log FROM prefix_table_campaign_lead_event_log WHERE (prefix_table_campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM prefix_table_campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND prefix_table_campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) AND campaign_id = :cmpId',
-                    [':daysOld' => $daysOld, ':cmpId' => 12235],
-                    [':daysOld' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld, ':cmpId' => 12235],
+                    ['daysOld' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
+                ],
+                [
+                    'UPDATE prefix_table_email_stats SET tokens = NULL WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL',
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
                     'DELETE prefix_table_email_stats_devices FROM prefix_table_email_stats_devices LEFT JOIN prefix_table_email_stats ON prefix_table_email_stats.id = prefix_table_email_stats_devices.stat_id WHERE prefix_table_email_stats.id IS NULL OR prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE is_published = 0 OR prefix_table_email_stats.email_id IS NULL AND date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    'DELETE prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE (prefix_table_emails.is_published = 0 OR prefix_table_email_stats.email_id IS NULL) AND prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
             ],
-            [34, 41, 3, 6],
-            '34 lead_event_log, 41 campaign_lead_event_log, 3 email_stats_devices and 6 email_stats rows have been deleted.',
+            [34, 41, 19, 3, 6],
+            '34 lead_event_log, 41 campaign_lead_event_log, 3 email_stats_devices and 6 email_stats rows have been deleted. 19 email_stats_tokens have been set to NULL.',
             false,
             12235,
         ];
 
-        // real run two tables with campaignId
-        yield 9 => [
+        yield 'real run two tables with campaignId' => [
             [
                 EventLogCleanup::EMAIL_STATS          => false,
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
@@ -330,17 +345,17 @@ class EventLogCleanupTest extends TestCase
             [
                 [
                     'DELETE prefix_table_campaign_lead_event_log FROM prefix_table_campaign_lead_event_log WHERE (prefix_table_campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM prefix_table_campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND prefix_table_campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY)) AND campaign_id = :cmpId',
-                    [':daysOld' => $daysOld, ':cmpId' => 65487],
-                    [':daysOld' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld, ':cmpId' => 65487],
+                    ['daysOld' => \PDO::PARAM_INT, ':cmpId' => \PDO::PARAM_INT],
                 ],
                 [
                     'DELETE prefix_table_lead_event_log FROM prefix_table_lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-                    [':daysOld' => $daysOld],
-                    [':daysOld' => \PDO::PARAM_INT],
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
                 ],
             ],
             [61, 22],
-            '61 campaign_lead_event_log, 22 lead_event_log rows have been deleted.',
+            '61 campaign_lead_event_log and 22 lead_event_log rows have been deleted.',
             false,
             65487,
         ];
