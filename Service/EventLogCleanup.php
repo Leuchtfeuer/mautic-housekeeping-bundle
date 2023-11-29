@@ -138,9 +138,9 @@ class EventLogCleanup
                 $queryTemplate = $this->queriesTemplate[$operation];
                 $queryTemplate = str_replace(self::SET, '', $queryTemplate);
 
-                $sql                = 'SELECT * FROM '.str_replace(self::PREFIX, $this->dbPrefix, $queryTemplate);
+                $sql                = 'SELECT COUNT(1) as cnt FROM '.str_replace(self::PREFIX, $this->dbPrefix, $queryTemplate);
                 $statement          = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
-                $result[$operation] = $statement->rowCount();
+                $result[$operation] = $statement->fetchOne();
 
                 if ($output->isVerbose()) {
                     $output->writeln($sql);
