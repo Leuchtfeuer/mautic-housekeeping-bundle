@@ -15,7 +15,7 @@ class EventLogCleanup
     /**
      * Constant used to indicate where the query can place "SET a = :a" when query is an update.
      */
-    private const SET = '%SET%';
+    private const SET = '%SET% ';
 
     private Config $config;
     private Connection $connection;
@@ -32,15 +32,15 @@ class EventLogCleanup
      * @var array<string, string>
      */
     private array $queriesTemplate = [
-        self::CAMPAIGN_LEAD_EVENTS => self::PREFIX.'campaign_lead_event_log WHERE ('.self::PREFIX.'campaign_lead_event_log.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM '.self::PREFIX.'campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND '.self::PREFIX.'campaign_lead_event_log.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
-        self::LEAD_EVENTS          => self::PREFIX.'lead_event_log WHERE date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-        self::EMAIL_STATS          => self::PREFIX.'email_stats LEFT JOIN '.self::PREFIX.'emails ON '.self::PREFIX.'email_stats.email_id = '.self::PREFIX.'emails.id WHERE ('.self::PREFIX.'emails.is_published = 0 OR '.self::PREFIX.'emails.publish_down < DATE_SUB(NOW(),INTERVAL :daysOld DAY) OR '.self::PREFIX.'email_stats.email_id IS NULL) AND '.self::PREFIX.'email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
-        self::EMAIL_STATS_TOKENS   => self::PREFIX.'email_stats '.self::SET.' WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL',
-        self::EMAIL_STATS_DEVICES  => self::PREFIX.'email_stats_devices LEFT JOIN '.self::PREFIX.'email_stats ON '.self::PREFIX.'email_stats.id = '.self::PREFIX.'email_stats_devices.stat_id WHERE '.self::PREFIX.'email_stats.id IS NULL OR '.self::PREFIX.'email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+        self::CAMPAIGN_LEAD_EVENTS => self::PREFIX.'campaign_lead_event_log as operation_table WHERE (operation_table.id NOT IN (SELECT maxId FROM (SELECT MAX(clel2.id) as maxId FROM '.self::PREFIX.'campaign_lead_event_log clel2 GROUP BY lead_id, campaign_id) as maxIds) AND operation_table.date_triggered < DATE_SUB(NOW(),INTERVAL :daysOld DAY))',
+        self::LEAD_EVENTS          => self::PREFIX.'lead_event_log as operation_table WHERE operation_table.date_added < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+        self::EMAIL_STATS          => self::PREFIX.'email_stats as operation_table LEFT JOIN '.self::PREFIX.'emails ON operation_table.email_id = '.self::PREFIX.'emails.id WHERE ('.self::PREFIX.'emails.is_published = 0 OR '.self::PREFIX.'emails.publish_down < DATE_SUB(NOW(),INTERVAL :daysOld DAY) OR operation_table.email_id IS NULL) AND operation_table.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+        self::EMAIL_STATS_TOKENS   => self::PREFIX.'email_stats as operation_table '.self::SET.'WHERE operation_table.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL',
+        self::EMAIL_STATS_DEVICES  => self::PREFIX.'email_stats_devices as operation_table LEFT JOIN '.self::PREFIX.'email_stats ON '.self::PREFIX.'email_stats.id = operation_table.stat_id WHERE '.self::PREFIX.'email_stats.id IS NULL OR '.self::PREFIX.'email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
     ];
 
     private array $update = [
-        self::EMAIL_STATS_TOKENS => 'SET tokens = NULL',
+        self::EMAIL_STATS_TOKENS => 'SET tokens = NULL ',
     ];
 
     private array $params = [
@@ -114,7 +114,7 @@ class EventLogCleanup
         }
 
         if (array_key_exists(self::EMAIL_STATS, $operations) && true === $operations[self::EMAIL_STATS]) {
-            unset($operations[self::EMAIL_STATS]);
+            unset($operations[self::EMAIL_STATS]); // this is needed to get a proper order of executed queries.
             $operations[self::EMAIL_STATS_DEVICES] = true;
             $operations[self::EMAIL_STATS]         = true;
         }
@@ -135,16 +135,7 @@ class EventLogCleanup
                     continue;
                 }
 
-                $queryTemplate = $this->queriesTemplate[$operation];
-                $queryTemplate = str_replace(self::SET, '', $queryTemplate);
-
-                $sql                = 'SELECT COUNT(1) as cnt FROM '.str_replace(self::PREFIX, $this->dbPrefix, $queryTemplate);
-                $statement          = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
-                $result[$operation] = $statement->fetchOne();
-
-                if ($output->isVerbose()) {
-                    $output->writeln($sql);
-                }
+                $result[$operation] = $this->getIntegerValue($operation, 'COUNT(1) as cnt', $output);
             }
         } else {
             foreach ($operations as $operation => $enabled) {
@@ -152,20 +143,7 @@ class EventLogCleanup
                     continue;
                 }
 
-                $queryTemplate = $this->queriesTemplate[$operation];
-                if (array_key_exists($operation, $this->update)) {
-                    $queryTemplate = str_replace(self::SET, $this->update[$operation], $queryTemplate);
-                    $sql           = 'UPDATE '.str_replace(self::PREFIX, $this->dbPrefix, $queryTemplate);
-                } else {
-                    $sql = 'DELETE '.$this->dbPrefix.$operation.' FROM '.str_replace(self::PREFIX, $this->dbPrefix, $queryTemplate);
-                }
-
-                $statement          = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
-                $result[$operation] = $statement->rowCount();
-
-                if ($output->isVerbose()) {
-                    $output->writeln($sql);
-                }
+                $result[$operation] = $this->applyChanges($operation, $output);
             }
         }
 
@@ -202,6 +180,87 @@ class EventLogCleanup
         }
 
         return $message;
+    }
+
+    private function getIntegerValue(string $operation, string $select, OutputInterface $output): int
+    {
+        $queryTemplate = $this->queriesTemplate[$operation];
+        $queryTemplate = str_replace(self::SET, '', $queryTemplate);
+
+        $sql       = 'SELECT '.$select.' FROM '.str_replace(self::PREFIX, $this->dbPrefix, $queryTemplate);
+        $statement = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
+        $result    = $statement->fetchOne();
+
+        if ($output->isVerbose()) {
+            $output->writeln($sql);
+        }
+
+        if (null !== $result && !is_numeric($result)) {
+            throw new \RuntimeException('The query must return a numeric value. '.gettype($result).' returned.');
+        }
+
+        return (int) $result;
+    }
+
+    private function applyChanges(string $operation, OutputInterface $output): int
+    {
+        $step  = 5000;
+        $minId = $this->getIntegerValue($operation, 'MIN(operation_table.id) as minId', $output);
+
+        if (0 === $minId && $output->isVerbose()) {
+            $output->writeln('<info>Seems like there are no queries to remove.</info>');
+
+            return 0;
+        }
+
+        $maxId = $this->getIntegerValue($operation, 'MAX(operation_table.id) as maxId', $output);
+
+        if ($minId > $maxId) {
+            throw new \RuntimeException('Something is wrong. MinId is greater than MaxId.');
+        }
+
+        $queryTemplate = $this->queriesTemplate[$operation];
+        if (array_key_exists($operation, $this->update)) {
+            $queryTemplate = str_replace(self::SET, $this->update[$operation], $queryTemplate);
+            $sql           = 'UPDATE '.str_replace(self::PREFIX, $this->dbPrefix, $queryTemplate);
+        } else {
+            $sql = 'DELETE operation_table FROM '.str_replace(self::PREFIX, $this->dbPrefix, $queryTemplate);
+        }
+
+        $parameters     = $this->params[$operation];
+        $types          = $this->types[$operation];
+        $types['minId'] = \PDO::PARAM_INT;
+        $types['maxId'] = \PDO::PARAM_INT;
+
+        $sql .= ' AND :minId <= operation_table.id AND operation_table.id <= :maxId';
+
+        $affectedRows = 0;
+        $processed    = 0;
+        while ($minId <= $maxId) {
+            $parameters['minId'] = $minId;
+            $parameters['maxId'] = min($maxId, $minId + $step);
+
+            $affectedRows += $this->connection->executeStatement($sql, $parameters, $types);
+
+            if ($output->isVerbose()) {
+                $output->writeln($sql);
+            }
+
+            $minId += $step;
+            $processed += $step;
+
+            if ($processed > 100000) {
+                try {
+                    $this->connection->commit();
+                    $this->connection->beginTransaction();
+                } catch (\Throwable $throwable) {
+                    $this->connection->rollBack();
+                    throw $throwable;
+                }
+            }
+        }
+
+        return $affectedRows;
     }
 
     /**

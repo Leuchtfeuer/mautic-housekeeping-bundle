@@ -4,6 +4,8 @@ on:
     branches:
       - master
       - '[0-9]+\-[0-9]+\-x'
+      - 'MTC\-[0-9]+'
+      - 'MTC\-[0-9]+-bugfix'
   pull_request:
 
 jobs:
