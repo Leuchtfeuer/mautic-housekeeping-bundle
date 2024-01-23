@@ -84,7 +84,7 @@ class EventLogCleanupTest extends TestCase
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT COUNT(1) as cnt FROM prefix_table_email_stats_devices LEFT JOIN prefix_table_email_stats ON prefix_table_email_stats.id = prefix_table_email_stats_devices.stat_id WHERE prefix_table_email_stats.id IS NULL OR prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'SELECT COUNT(1) as cnt FROM prefix_table_email_stats_devices WHERE prefix_table_email_stats_devices.date_opened < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     ['daysOld' => $daysOld],
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
@@ -129,7 +129,7 @@ class EventLogCleanupTest extends TestCase
             ],
             [
                 [
-                    'SELECT COUNT(1) as cnt FROM prefix_table_email_stats_devices LEFT JOIN prefix_table_email_stats ON prefix_table_email_stats.id = prefix_table_email_stats_devices.stat_id WHERE prefix_table_email_stats.id IS NULL OR prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'SELECT COUNT(1) as cnt FROM prefix_table_email_stats_devices WHERE prefix_table_email_stats_devices.date_opened < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     ['daysOld' => $daysOld],
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
@@ -169,7 +169,7 @@ class EventLogCleanupTest extends TestCase
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'SELECT COUNT(1) as cnt FROM prefix_table_email_stats_devices LEFT JOIN prefix_table_email_stats ON prefix_table_email_stats.id = prefix_table_email_stats_devices.stat_id WHERE prefix_table_email_stats.id IS NULL OR prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'SELECT COUNT(1) as cnt FROM prefix_table_email_stats_devices WHERE prefix_table_email_stats_devices.date_opened < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     ['daysOld' => $daysOld],
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
@@ -234,7 +234,7 @@ class EventLogCleanupTest extends TestCase
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE prefix_table_email_stats_devices FROM prefix_table_email_stats_devices LEFT JOIN prefix_table_email_stats ON prefix_table_email_stats.id = prefix_table_email_stats_devices.stat_id WHERE prefix_table_email_stats.id IS NULL OR prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'DELETE prefix_table_email_stats_devices FROM prefix_table_email_stats_devices WHERE prefix_table_email_stats_devices.date_opened < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     ['daysOld' => $daysOld],
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
@@ -279,7 +279,7 @@ class EventLogCleanupTest extends TestCase
             ],
             [
                 [
-                    'DELETE prefix_table_email_stats_devices FROM prefix_table_email_stats_devices LEFT JOIN prefix_table_email_stats ON prefix_table_email_stats.id = prefix_table_email_stats_devices.stat_id WHERE prefix_table_email_stats.id IS NULL OR prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'DELETE prefix_table_email_stats_devices FROM prefix_table_email_stats_devices WHERE prefix_table_email_stats_devices.date_opened < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     ['daysOld' => $daysOld],
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
@@ -319,7 +319,7 @@ class EventLogCleanupTest extends TestCase
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
-                    'DELETE prefix_table_email_stats_devices FROM prefix_table_email_stats_devices LEFT JOIN prefix_table_email_stats ON prefix_table_email_stats.id = prefix_table_email_stats_devices.stat_id WHERE prefix_table_email_stats.id IS NULL OR prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    'DELETE prefix_table_email_stats_devices FROM prefix_table_email_stats_devices WHERE prefix_table_email_stats_devices.date_opened < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     ['daysOld' => $daysOld],
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
