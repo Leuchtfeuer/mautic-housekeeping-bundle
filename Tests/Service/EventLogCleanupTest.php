@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Tests\Service;
 
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\Driver\Result;
-use Generator;
+use Doctrine\DBAL\Result;
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config;
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Service\EventLogCleanup;
 use PHPUnit\Framework\TestCase;
@@ -32,8 +31,18 @@ class EventLogCleanupTest extends TestCase
         $connection = $this->createMock(Connection::class);
         $connection->expects(self::exactly(count($queries)))
             ->method('executeQuery')
-            ->withConsecutive(...$queries)
-            ->willReturnOnConsecutiveCalls(...$statements);
+            ->willReturnCallback(static function (string $sql, array $params, array $types) use (&$queries, &$statements): Result {
+                self::assertCount(count($queries), $statements);
+                $query     = array_shift($queries);
+                $statement = array_shift($statements);
+
+                self::assertCount(3, $query);
+                self::assertSame($sql, $query[0]);
+                self::assertSame($params, $query[1]);
+                self::assertSame($types, $query[2]);
+
+                return $statement;
+            });
 
         $loggedQueries = [];
         foreach ($queries as $query) {
@@ -46,7 +55,11 @@ class EventLogCleanupTest extends TestCase
             ->willReturn(true);
         $output->expects(self::exactly(count($queries)))
             ->method('writeln')
-            ->withConsecutive(...$loggedQueries);
+            ->willReturnCallback(static function (string $loggedQuery) use (&$loggedQueries): void {
+                $expected = array_shift($loggedQueries);
+                self::assertCount(1, $expected);
+                self::assertSame($loggedQuery, $expected[0]);
+            });
 
         $config = $this->createMock(Config::class);
         $config->method('isPublished')
@@ -56,7 +69,7 @@ class EventLogCleanupTest extends TestCase
         self::assertSame($message, $eventLogCleanup->deleteEventLogEntries(4, $campaignId, $dryRun, $operations, $output));
     }
 
-    public function runProvider(): Generator
+    public function runProvider(): \Generator
     {
         $daysOld = 4;
 
@@ -66,6 +79,7 @@ class EventLogCleanupTest extends TestCase
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
                 EventLogCleanup::EMAIL_STATS          => true,
                 EventLogCleanup::EMAIL_STATS_TOKENS   => true,
+                EventLogCleanup::PAGE_HITS            => true,
             ],
             [
                 [
@@ -84,6 +98,11 @@ class EventLogCleanupTest extends TestCase
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
+                    'SELECT COUNT(1) as cnt FROM prefix_table_page_hits WHERE date_hit < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
+                ],
+                [
                     'SELECT COUNT(1) as cnt FROM prefix_table_email_stats_devices WHERE prefix_table_email_stats_devices.date_opened < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     ['daysOld' => $daysOld],
                     ['daysOld' => \PDO::PARAM_INT],
@@ -94,8 +113,8 @@ class EventLogCleanupTest extends TestCase
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
             ],
-            [3, 14, 23, 55, 57],
-            '3 lead_event_log, 14 campaign_lead_event_log, 55 email_stats_devices and 57 email_stats rows would have been deleted. 23 email_stats_tokens will be set to NULL. This is a dry run.',
+            [3, 14, 23, 4, 55, 57],
+            '3 lead_event_log, 14 campaign_lead_event_log, 4 page_hits, 55 email_stats_devices and 57 email_stats rows would have been deleted. 23 email_stats_tokens will be set to NULL. This is a dry run.',
             true,
             null,
         ];
@@ -216,6 +235,7 @@ class EventLogCleanupTest extends TestCase
                 EventLogCleanup::CAMPAIGN_LEAD_EVENTS => true,
                 EventLogCleanup::EMAIL_STATS          => true,
                 EventLogCleanup::EMAIL_STATS_TOKENS   => true,
+                EventLogCleanup::PAGE_HITS            => true,
             ],
             [
                 [
@@ -234,6 +254,11 @@ class EventLogCleanupTest extends TestCase
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
                 [
+                    'DELETE prefix_table_page_hits FROM prefix_table_page_hits WHERE date_hit < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                    ['daysOld' => $daysOld],
+                    ['daysOld' => \PDO::PARAM_INT],
+                ],
+                [
                     'DELETE prefix_table_email_stats_devices FROM prefix_table_email_stats_devices WHERE prefix_table_email_stats_devices.date_opened < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
                     ['daysOld' => $daysOld],
                     ['daysOld' => \PDO::PARAM_INT],
@@ -244,8 +269,8 @@ class EventLogCleanupTest extends TestCase
                     ['daysOld' => \PDO::PARAM_INT],
                 ],
             ],
-            [3, 14, 32, 55, 41],
-            '3 lead_event_log, 14 campaign_lead_event_log, 55 email_stats_devices and 41 email_stats rows have been deleted. 32 email_stats_tokens have been set to NULL.',
+            [3, 14, 32, 21, 55, 41],
+            '3 lead_event_log, 14 campaign_lead_event_log, 21 page_hits, 55 email_stats_devices and 41 email_stats rows have been deleted. 32 email_stats_tokens have been set to NULL.',
             false,
             null,
         ];
