@@ -30,8 +30,23 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 ### Notice
 - Every last entry from the campaign_lead_event_log per campaign will be kept. This is due to contacts restarting campaigns if there is no last step preserved in the log.
 
-### Known issues
-- A `--dry-run` might fail on databases with a huge amount of entries.
+### Deleting huge ammounts of data
+- It might happen that the plugin fails to delete if the data is too large to handle. In that case: Create the following bash script and iterate through the deletion day by day:
+```
+#!/bin/sh
+DOCROOT="path/to/mautic"
+TIME="/usr/bin/time"
+OUT="$DOCROOT/../log/housekeeping-loop.date +%Y%m%d_%H%M%S"
+START=put_start_day_here #(for example 200)
+END=put_end_day_here  #(for example 100)
+OP="put_your_operator_here" #(for example "-m" for emails / "-p" for page_hits | needs to be in "")
+
+seq $START -1 $END |while read i ; do
+echo "********** $i **********" >> $OUT
+$TIME -ao $OUT sudo -u www-data php $DOCROOT/bin/console leu:hou $OP -d $i 2>&1 >>$OUT
+sleep 2
+done
+```
 
 ### Author
 Leuchtfeuer Digital Marketing GmbH
