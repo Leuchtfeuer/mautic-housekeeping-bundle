@@ -20,6 +20,7 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 -m  | --email-stats             | Only entries from the email_stats table where the referenced email entry is currently not published and from the email_stats_devices table will be deleted.
 -t  | --email-stats-tokens      | Set only tokens fields in Email Stats Records to NULL. Important: This option can not be combined with any "-c", "-l" or "-m" flag in one command. And: If the option flag "-t" is not set, the NULL setting of tokens will not be done with the basis command, so if you just run mautic:leuchtfeuer:housekeeping without a flag.
 -l  | --lead                    | Only entries from the lead_event_log table will be deleted.
+-p  | --page-hits               | Only entries from the page_hits table will be deleted.
 ```
 
 ### Installation
