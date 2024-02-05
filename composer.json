@@ -35,6 +35,20 @@
     "repositories": [
         {
             "type": "git",
+            "url": "https://github.com/mautic/FOSOAuthServerBundle.git"
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/mautic/SpBundle.git",
+            "canonical": false
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/mautic/SymfonyBridgeBundle.git",
+            "canonical": false
+        },
+        {
+            "type": "git",
             "url": "https://github.com/dennisameling/FOSOAuthServerBundle.git"
         },
         {
@@ -43,7 +57,7 @@
         }
     ],
     "scripts": {
-        "cs-fix": "./vendor/bin/php-cs-fixer fix --config .php-cs-fixer.php --using-cache no --show-progress dots -v"
+        "fixcs": "./vendor/bin/php-cs-fixer fix --config .php-cs-fixer.php --using-cache no --show-progress dots -v"
     },
     "config": {
         "allow-plugins": {

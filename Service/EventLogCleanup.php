@@ -27,6 +27,7 @@ class EventLogCleanup
     public const EMAIL_STATS          = 'email_stats';
     public const EMAIL_STATS_TOKENS   = 'email_stats_tokens';
     private const EMAIL_STATS_DEVICES = 'email_stats_devices';
+    public const PAGE_HITS            = 'page_hits';
 
     /**
      * @var array<string, string>
@@ -37,6 +38,7 @@ class EventLogCleanup
         self::EMAIL_STATS          => self::PREFIX.'email_stats LEFT JOIN '.self::PREFIX.'emails ON '.self::PREFIX.'email_stats.email_id = '.self::PREFIX.'emails.id WHERE ('.self::PREFIX.'emails.is_published = 0 OR '.self::PREFIX.'emails.publish_down < DATE_SUB(NOW(),INTERVAL :daysOld DAY) OR '.self::PREFIX.'email_stats.email_id IS NULL) AND '.self::PREFIX.'email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
         self::EMAIL_STATS_TOKENS   => self::PREFIX.'email_stats '.self::SET.' WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL',
         self::EMAIL_STATS_DEVICES  => self::PREFIX.'email_stats_devices WHERE '.self::PREFIX.'email_stats_devices.date_opened < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+        self::PAGE_HITS            => self::PREFIX.'page_hits WHERE date_hit < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
     ];
 
     private array $update = [
@@ -59,6 +61,9 @@ class EventLogCleanup
         self::EMAIL_STATS_DEVICES  => [
             'daysOld' => self::DEFAULT_DAYS,
         ],
+        self::PAGE_HITS            => [
+            'daysOld' => self::DEFAULT_DAYS,
+        ],
     ];
 
     private array $types = [
@@ -75,6 +80,9 @@ class EventLogCleanup
             'daysOld' => \PDO::PARAM_INT,
         ],
         self::EMAIL_STATS_DEVICES  => [
+            'daysOld' => \PDO::PARAM_INT,
+        ],
+        self::PAGE_HITS            => [
             'daysOld' => \PDO::PARAM_INT,
         ],
     ];
@@ -125,6 +133,7 @@ class EventLogCleanup
             self::EMAIL_STATS          => 0,
             self::EMAIL_STATS_TOKENS   => 0,
             self::EMAIL_STATS_DEVICES  => 0,
+            self::PAGE_HITS            => 0,
         ];
 
         $this->connection->beginTransaction();
