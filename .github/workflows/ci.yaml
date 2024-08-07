@@ -2,7 +2,7 @@ name: Continous Integration
 on:
   push:
     branches:
-      - master
+      - main
       - 'MTC\-[0-9]+'
   pull_request:
 
@@ -25,4 +25,13 @@ jobs:
       - name: Check PHP CS
         run: ./vendor/bin/php-cs-fixer fix --config .php-cs-fixer.php --dry-run --using-cache no --show-progress dots -v
       - name: Test
-        run: ./vendor/bin/phpunit
+        run: ./vendor/bin/phpunit --coverage-cobertura=coverage.xml
+      - name: Code Coverage
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: coverage.xml
+          badge: true
+          format: 'markdown'
+          output: 'both'
+      - name: Write to Job Summary
+        run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
