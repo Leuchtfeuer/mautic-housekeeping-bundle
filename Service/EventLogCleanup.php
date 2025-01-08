@@ -116,8 +116,8 @@ class EventLogCleanup
         }
 
         if (null !== $campaignId && $operations[self::CAMPAIGN_LEAD_EVENTS]) {
-            $this->params[self::CAMPAIGN_LEAD_EVENTS][':cmpId'] = $campaignId;
-            $this->types[self::CAMPAIGN_LEAD_EVENTS][':cmpId']  = \PDO::PARAM_INT;
+            $this->params[self::CAMPAIGN_LEAD_EVENTS]['cmpId'] = $campaignId;
+            $this->types[self::CAMPAIGN_LEAD_EVENTS]['cmpId']  = \PDO::PARAM_INT;
             $this->queriesTemplate[self::CAMPAIGN_LEAD_EVENTS] .= ' AND campaign_id = :cmpId';
         }
 
