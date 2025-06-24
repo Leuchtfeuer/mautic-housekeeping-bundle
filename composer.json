@@ -1,13 +1,17 @@
 {
     "name": "leuchtfeuer/leuchtfeuer-housekeeping-bundle",
+    "description": "A Mautic plugin to automatically delete or clean up contacts and related data based on configurable rules.",
     "type": "mautic-plugin",
     "license": "GPL-3.0-or-later",
     "authors": [
         {
             "name": "Leuchtfeuer Digital Marketing GmbH",
-            "email": "mautic@Leuchtfeuer.com"
+            "email": "mautic@Leuchtfeuer.com",
+            "homepage": "https://Leuchtfeuer.com/mautic/",
+            "role": "Developer"
         }
     ],
+    "keywords": ["mautic","plugin","integration","cleanup", "housekeeping"],
     "minimum-stability": "dev",
     "prefer-stable": true,
     "require": {
