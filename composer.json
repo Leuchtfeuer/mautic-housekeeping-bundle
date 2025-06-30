@@ -1,13 +1,17 @@
 {
     "name": "leuchtfeuer/leuchtfeuer-housekeeping-bundle",
+    "description": "A Mautic plugin that helps you to keep your database in a good shape",
     "type": "mautic-plugin",
     "license": "GPL-3.0-or-later",
     "authors": [
         {
             "name": "Leuchtfeuer Digital Marketing GmbH",
-            "email": "mautic@Leuchtfeuer.com"
+            "email": "mautic@Leuchtfeuer.com",
+            "homepage": "https://Leuchtfeuer.com/mautic/",
+            "role": "Developer"
         }
     ],
+    "keywords": ["mautic","plugin","integration","cleanup", "housekeeping"],
     "minimum-stability": "dev",
     "prefer-stable": true,
     "require": {
