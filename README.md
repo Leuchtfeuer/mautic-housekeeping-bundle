@@ -27,6 +27,9 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 - Plugin must be saved under plugins/LeuchtfeuerHousekeepingBundle/
 - Afterwards, the cache must be cleared.
 
+### Compatiblity
+- Plugin is for Mautic 5 and also backwards compatible for Mautic 4.
+
 ### Notice
 - Every last entry from the campaign_lead_event_log per campaign will be kept. This is due to contacts restarting campaigns if there is no last step preserved in the log.
 
