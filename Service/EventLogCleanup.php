@@ -6,6 +6,7 @@ namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Service;
 
 use Doctrine\DBAL\Connection;
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class EventLogCleanup
@@ -16,10 +17,6 @@ class EventLogCleanup
      * Constant used to indicate where the query can place "SET a = :a" when query is an update.
      */
     private const SET = '%SET%';
-
-    private Config $config;
-    private Connection $connection;
-    private string $dbPrefix;
 
     public const DEFAULT_DAYS         = 365;
     public const CAMPAIGN_LEAD_EVENTS = 'campaign_lead_event_log';
@@ -93,11 +90,8 @@ class EventLogCleanup
     private string $dryRunUpdateMessage = ' will be set to NULL.';
     private string $runUpdateMessage    = ' have been set to NULL.';
 
-    public function __construct(Connection $connection, ?string $dbPrefix, Config $config)
+    public function __construct(private Connection $connection, private ?string $dbPrefix, private Config $config, private LoggerInterface $logger)
     {
-        $this->connection = $connection;
-        $this->dbPrefix   = $dbPrefix ?? '';
-        $this->config     = $config;
     }
 
     /**
@@ -237,5 +231,44 @@ class EventLogCleanup
         }
 
         return $message.$postfix;
+    }
+
+    public function optimizeTables(OutputInterface $output): string
+    {
+        try {
+            $tables = $this->getAllTables();
+
+            if (empty($tables)) {
+                return 'No tables found to optimize.';
+            }
+
+            // Alle Tabellen in einem Query optimieren
+            $tableList = '`'.implode('`, `', $tables).'`';
+            $sql       = "OPTIMIZE TABLE {$tableList}";
+
+            if ($output->isVerbose()) {
+                $output->writeln('Optimizing '.count($tables).' tables...');
+                $output->writeln($sql);
+            }
+
+            $statement = $this->connection->executeQuery($sql);
+            $results   = $statement->fetchAllAssociative();
+
+            $message = 'All tables have been optimized.';
+
+            return $message;
+        } catch (\Throwable $e) {
+            $errorMsg = 'Table optimization failed: '.$e->getMessage();
+            $this->logger->error($errorMsg);
+            throw $e;
+        }
+    }
+
+    private function getAllTables(): array
+    {
+        $sql       = 'SHOW TABLES';
+        $statement = $this->connection->executeQuery($sql);
+
+        return $statement->fetchFirstColumn();
     }
 }
