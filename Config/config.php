@@ -7,10 +7,6 @@ $configValue = [
     'author'      => 'Leuchtfeuer Digital Marketing GmbH',
 ];
 
-if (version_compare(MAUTIC_VERSION, '5', '>=')) {
-    return $configValue;
-}
-
 $configValue['services'] = [
     'integrations' => [
         'mautic.integration.housekeepingleuchtfeuer' => [
@@ -46,6 +42,7 @@ $configValue['services'] = [
                 'database_connection',
                 '%mautic.db_table_prefix%',
                 'mautic.housekeepingleuchtfeuer.config',
+                'monolog.logger.mautic',
             ],
         ],
         'mautic.housekeepingleuchtfeuer.config' => [

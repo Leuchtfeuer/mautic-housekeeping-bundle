@@ -264,9 +264,7 @@ class EventLogCleanup
             $statement = $this->connection->executeQuery($sql);
             $results   = $statement->fetchAllAssociative();
 
-            $message = 'All tables have been optimized.';
-
-            return $message;
+            return 'All tables have been optimized.';
         } catch (\Throwable $e) {
             $errorMsg = 'Table optimization failed: '.$e->getMessage();
             $this->logger->error($errorMsg);

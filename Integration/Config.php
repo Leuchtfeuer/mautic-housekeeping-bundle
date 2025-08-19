@@ -10,11 +10,8 @@ use Mautic\PluginBundle\Entity\Integration;
 
 class Config
 {
-    private IntegrationsHelper $integrationsHelper;
-
-    public function __construct(IntegrationsHelper $integrationsHelper)
+    public function __construct(private IntegrationsHelper $integrationsHelper)
     {
-        $this->integrationsHelper = $integrationsHelper;
     }
 
     public function isPublished(): bool
@@ -23,7 +20,7 @@ class Config
             $integration = $this->getIntegrationEntity();
 
             return (bool) $integration->getIsPublished();
-        } catch (IntegrationNotFoundException $e) {
+        } catch (IntegrationNotFoundException) {
             return false;
         }
     }

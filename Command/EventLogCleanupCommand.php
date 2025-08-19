@@ -16,12 +16,8 @@ class EventLogCleanupCommand extends Command
 
     private const DEFAULT_DAYS = 365;
 
-    private EventLogCleanup $eventLogCleanup;
-
-    public function __construct(EventLogCleanup $eventLogCleanup)
+    public function __construct(private EventLogCleanup $eventLogCleanup)
     {
-        $this->eventLogCleanup = $eventLogCleanup;
-
         parent::__construct(null);
     }
 
@@ -125,17 +121,16 @@ class EventLogCleanupCommand extends Command
         $output->writeln('<info>'.$message.'<info>');
 
         $optimizeTables = $input->getOption('optimize-tables');
-        if (null !== $optimizeTables) {
+        if ($optimizeTables && !$dryRun) {
             try {
                 $message = $this->eventLogCleanup->optimizeTables($output);
+                $output->writeln('<info>'.$message.'<info>');
             } catch (\Throwable $e) {
                 $output->writeln(sprintf('<error>Table optimization failed: %s</error>', $e->getMessage()));
 
                 return 1;
             }
         }
-
-        $output->writeln('<info>'.$message.'<info>');
 
         return 0;
     }
