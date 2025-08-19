@@ -45,7 +45,7 @@ class EventLogCleanupCommand extends Command
                     new InputOption('email-stats', 'm', InputOption::VALUE_NONE, 'Purge only Email Stats Records where the referenced email entry is currently not published and purge Email Stats Devices. Important: If referenced email is ever switched back to published, the contacts will get the email again.'),
                     new InputOption('email-stats-tokens', 't', InputOption::VALUE_NONE, 'Set only tokens fields in Email Stats Records to NULL. Important: This option can not be combined with any "-c", "-l" or "-m" flag in one command. And: If the option flag "-t" is not set, the NULL setting of tokens will not be done with the basis command, so if you just run mautic:leuchtfeuer:housekeeping without a flag)'),
                     new InputOption('cmp-id', 'i', InputOption::VALUE_OPTIONAL, 'Delete only campaign_lead_eventLog for a specific CampaignID. Implies --campaign-lead.', 'none'),
-                    new InputOption('optimize-tables', 'o', InputOption::VALUE_OPTIONAL, 'Optimize all database tables after cleanup.'),
+                    new InputOption('optimize-tables', 'o', InputOption::VALUE_NONE, 'Optimize all database tables after cleanup.'),
                 ]
             )
             ->setHelp(
@@ -59,6 +59,9 @@ class EventLogCleanupCommand extends Command
 
                 You can also optionally specify a dry run without deleting any records:
                 <info>php %command.full_name% --days-old=365 --dry-run</info>
+                
+                You can also optionally ensure that the OPTIMIZE TABLES command will run after deleting the records:
+                <info>php %command.full_name% --optimize-tables</info>
 
                 You can also optionally specify for which campaign the entries should be purged from campaign_lead_event_log:
                 <info>php %command.full_name% --cmp-id=123</info>
