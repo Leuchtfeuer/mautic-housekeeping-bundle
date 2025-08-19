@@ -38,10 +38,16 @@ class EventLogCleanup
         self::PAGE_HITS            => self::PREFIX.'page_hits WHERE date_hit < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
     ];
 
+    /**
+     * @var array<string, string>
+     */
     private array $update = [
         self::EMAIL_STATS_TOKENS => 'SET tokens = NULL',
     ];
 
+    /**
+     * @var array<string, array<string, int>>
+     */
     private array $params = [
         self::CAMPAIGN_LEAD_EVENTS => [
             'daysOld' => self::DEFAULT_DAYS,
@@ -63,6 +69,9 @@ class EventLogCleanup
         ],
     ];
 
+    /**
+     * @var array<string, array<string, int>>
+     */
     private array $types = [
         self::CAMPAIGN_LEAD_EVENTS => [
             'daysOld' => \PDO::PARAM_INT,
@@ -242,7 +251,6 @@ class EventLogCleanup
                 return 'No tables found to optimize.';
             }
 
-            // Alle Tabellen in einem Query optimieren
             $tableList = '`'.implode('`, `', $tables).'`';
             $sql       = "OPTIMIZE TABLE {$tableList}";
 

@@ -15,6 +15,7 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 ```
 -d  | --days-old                | Specifies the minimum age of the entries to be deleted. Default: 365 days
 -r  | --dry-run                 | Execute as dry run. No entries will be deleted
+-0  | --optimize-tables         | Runs OPTIMIZE TABLE on all Mautic tables after the entries have been deleted.
 -i  | --cmp-id                  | Delete only data for a specific campaign ID from campaign_lead_event_log
 -c  | --campaign-lead           | Only entries from the campaign_lead_event_log table will be deleted
 -m  | --email-stats             | Only entries from the email_stats table where the referenced email entry is currently not published and from the email_stats_devices table will be deleted.
