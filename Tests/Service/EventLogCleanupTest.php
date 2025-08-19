@@ -65,7 +65,9 @@ class EventLogCleanupTest extends TestCase
         $config->method('isPublished')
             ->willReturn(true);
 
-        $eventLogCleanup = new EventLogCleanup($connection, 'prefix_table_', $config);
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        $eventLogCleanup = new EventLogCleanup($connection, 'prefix_table_', $config, $logger);
         self::assertSame($message, $eventLogCleanup->deleteEventLogEntries(4, $campaignId, $dryRun, $operations, $output));
     }
 

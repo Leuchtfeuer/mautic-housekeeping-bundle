@@ -6,20 +6,18 @@ namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Service;
 
 use Doctrine\DBAL\Connection;
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class EventLogCleanup
 {
     private const PREFIX = '%PREFIX%';
+    private string $dbPrefix;
 
     /**
      * Constant used to indicate where the query can place "SET a = :a" when query is an update.
      */
     private const SET = '%SET%';
-
-    private Config $config;
-    private Connection $connection;
-    private string $dbPrefix;
 
     public const DEFAULT_DAYS         = 365;
     public const CAMPAIGN_LEAD_EVENTS = 'campaign_lead_event_log';
@@ -41,10 +39,16 @@ class EventLogCleanup
         self::PAGE_HITS            => self::PREFIX.'page_hits WHERE date_hit < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
     ];
 
+    /**
+     * @var array<string, string>
+     */
     private array $update = [
         self::EMAIL_STATS_TOKENS => 'SET tokens = NULL',
     ];
 
+    /**
+     * @var array<string, array<string, int>>
+     */
     private array $params = [
         self::CAMPAIGN_LEAD_EVENTS => [
             'daysOld' => self::DEFAULT_DAYS,
@@ -66,6 +70,9 @@ class EventLogCleanup
         ],
     ];
 
+    /**
+     * @var array<string, array<string, int>>
+     */
     private array $types = [
         self::CAMPAIGN_LEAD_EVENTS => [
             'daysOld' => \PDO::PARAM_INT,
@@ -93,11 +100,9 @@ class EventLogCleanup
     private string $dryRunUpdateMessage = ' will be set to NULL.';
     private string $runUpdateMessage    = ' have been set to NULL.';
 
-    public function __construct(Connection $connection, ?string $dbPrefix, Config $config)
+    public function __construct(private Connection $connection, ?string $dbPrefix, private Config $config, private LoggerInterface $logger)
     {
-        $this->connection = $connection;
-        $this->dbPrefix   = $dbPrefix ?? '';
-        $this->config     = $config;
+        $this->dbPrefix = $dbPrefix ?? '';
     }
 
     /**
@@ -237,5 +242,41 @@ class EventLogCleanup
         }
 
         return $message.$postfix;
+    }
+
+    public function optimizeTables(OutputInterface $output): string
+    {
+        try {
+            $tables = $this->getAllTables();
+
+            if (empty($tables)) {
+                return 'No tables found to optimize.';
+            }
+
+            $tableList = '`'.implode('`, `', $tables).'`';
+            $sql       = "OPTIMIZE TABLE {$tableList}";
+
+            if ($output->isVerbose()) {
+                $output->writeln('Optimizing '.count($tables).' tables...');
+                $output->writeln($sql);
+            }
+
+            $statement = $this->connection->executeQuery($sql);
+            $results   = $statement->fetchAllAssociative();
+
+            return 'All tables have been optimized.';
+        } catch (\Throwable $e) {
+            $errorMsg = 'Table optimization failed: '.$e->getMessage();
+            $this->logger->error($errorMsg);
+            throw $e;
+        }
+    }
+
+    private function getAllTables(): array
+    {
+        $sql       = 'SHOW TABLES';
+        $statement = $this->connection->executeQuery($sql);
+
+        return $statement->fetchFirstColumn();
     }
 }

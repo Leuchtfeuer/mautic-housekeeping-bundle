@@ -3,13 +3,9 @@
 $configValue = [
     'name'        => 'Housekeeping by Leuchtfeuer',
     'description' => 'Database Cleanup Command to delete lead_event_log table entries, campaign_lead_event_log table entries, email_stats table entries where the referenced email entry is currently not published and email_stats_devices table entries.',
-    'version'     => '4.0.2',
+    'version'     => '4.0.3',
     'author'      => 'Leuchtfeuer Digital Marketing GmbH',
 ];
-
-if (version_compare(MAUTIC_VERSION, '5', '>=')) {
-    return $configValue;
-}
 
 $configValue['services'] = [
     'integrations' => [
@@ -46,6 +42,7 @@ $configValue['services'] = [
                 'database_connection',
                 '%mautic.db_table_prefix%',
                 'mautic.housekeepingleuchtfeuer.config',
+                'monolog.logger.mautic',
             ],
         ],
         'mautic.housekeepingleuchtfeuer.config' => [
