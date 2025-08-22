@@ -169,9 +169,9 @@ class EventLogCleanup
                 $queryTemplate = $this->queriesTemplate[$operation];
                 if (array_key_exists($operation, $this->update)) {
                     $queryTemplate = str_replace(self::SET, $this->update[$operation], $queryTemplate);
-                    $sql           = 'UPDATE '.str_replace(self::PREFIX, $this->dbPrefix, $queryTemplate);
+                    $sql           = 'UPDATE LOW_PRIORITY '.str_replace(self::PREFIX, $this->dbPrefix, $queryTemplate);
                 } else {
-                    $sql = 'DELETE '.$this->dbPrefix.$operation.' FROM '.str_replace(self::PREFIX, $this->dbPrefix, $queryTemplate);
+                    $sql = 'DELETE LOW_PRIORITY '.$this->dbPrefix.$operation.' FROM '.str_replace(self::PREFIX, $this->dbPrefix, $queryTemplate);
                 }
 
                 $statement          = $this->connection->executeQuery($sql, $this->params[$operation], $this->types[$operation]);
