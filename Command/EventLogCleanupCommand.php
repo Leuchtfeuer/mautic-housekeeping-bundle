@@ -109,7 +109,6 @@ class EventLogCleanupCommand extends Command
             return 1;
         }
 
-        // Nur Cleanup-Operationen ausführen, wenn welche aktiviert sind
         if (array_sum($operations) > 0) {
             try {
                 $message = $this->eventLogCleanup->deleteEventLogEntries(
@@ -128,7 +127,6 @@ class EventLogCleanupCommand extends Command
             $output->writeln('<info>'.$message.'<info>');
         }
 
-        // Tabellen-Optimierung ausführen (unabhängig von Cleanup-Operationen)
         if ($optimizeTables && !$dryRun) {
             try {
                 $message = $this->eventLogCleanup->optimizeTables($output);
