@@ -85,6 +85,8 @@ class EventLogCleanupCommand extends Command
         $daysOld                              = (int) $input->getOption('days-old');
         $dryRun                               = $input->getOption('dry-run');
         $campaignId                           = 'none' === $input->getOption('cmp-id') ? null : (int) $input->getOption('cmp-id');
+        $optimizeTables                       = $input->getOption('optimize-tables');
+
         $operations                           = [
             EventLogCleanup::CAMPAIGN_LEAD_EVENTS => $input->getOption('campaign-lead') || null !== $campaignId,
             EventLogCleanup::LEAD_EVENTS          => $input->getOption('lead'),
@@ -93,34 +95,38 @@ class EventLogCleanupCommand extends Command
             EventLogCleanup::PAGE_HITS            => $input->getOption('page-hits'),
         ];
 
-        if (0 === array_sum($operations)) {
+        $hasCleanupOperations = array_sum($operations) > 0;
+        if ($optimizeTables && !$hasCleanupOperations) {
+            $operations = array_combine(array_keys($operations), array_fill(0, count($operations), false));
+        } elseif (0 === array_sum($operations)) {
             $operations                                      = array_combine(array_keys($operations), array_fill(0, count($operations), true));
             $operations[EventLogCleanup::EMAIL_STATS_TOKENS] = false;
         }
 
         if ((true === $operations[EventLogCleanup::EMAIL_STATS_TOKENS]) && (((true === $operations[EventLogCleanup::EMAIL_STATS]) || (true === $operations[EventLogCleanup::CAMPAIGN_LEAD_EVENTS])) || (true === $operations[EventLogCleanup::LEAD_EVENTS]))) {
-            $output->writeln('<error>The combination of “-t” flag with either “-m” flag or “-c” flag or “-l” flag is not supported/possible. You can only combine the "-t" flag with "-d" flag and/or "-r" flag.</error>');
+            $output->writeln('<error>The combination of "-t" flag with either "-m" flag or "-c" flag or "-l" flag is not supported/possible. You can only combine the "-t" flag with "-d" flag and/or "-r" flag.</error>');
 
             return 1;
         }
 
-        try {
-            $message = $this->eventLogCleanup->deleteEventLogEntries(
-                $daysOld,
-                $campaignId,
-                $dryRun,
-                $operations,
-                $output
-            );
-        } catch (\Throwable $e) {
-            $output->writeln(sprintf('<error>Deletion of Log Rows failed because of database error: %s</error>', $e->getMessage()));
+        if (array_sum($operations) > 0) {
+            try {
+                $message = $this->eventLogCleanup->deleteEventLogEntries(
+                    $daysOld,
+                    $campaignId,
+                    $dryRun,
+                    $operations,
+                    $output
+                );
+            } catch (\Throwable $e) {
+                $output->writeln(sprintf('<error>Deletion of Log Rows failed because of database error: %s</error>', $e->getMessage()));
 
-            return 1;
+                return 1;
+            }
+
+            $output->writeln('<info>'.$message.'<info>');
         }
 
-        $output->writeln('<info>'.$message.'<info>');
-
-        $optimizeTables = $input->getOption('optimize-tables');
         if ($optimizeTables && !$dryRun) {
             try {
                 $message = $this->eventLogCleanup->optimizeTables($output);
