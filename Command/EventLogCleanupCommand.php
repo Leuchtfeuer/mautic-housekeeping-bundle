@@ -12,7 +12,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class EventLogCleanupCommand extends Command
 {
-    protected static $defaultName = 'leuchtfeuer:housekeeping';
+    protected static $defaultName = 'leuchtfeuer:housekeeping'; // @phpstan-ignore-line compatibility with Mautic 5
 
     private const DEFAULT_DAYS = 365;
 

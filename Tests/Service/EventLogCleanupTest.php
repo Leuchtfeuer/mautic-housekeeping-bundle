@@ -75,7 +75,7 @@ class EventLogCleanupTest extends TestCase
         self::assertSame($message, $eventLogCleanup->deleteEventLogEntries(4, $campaignId, $dryRun, $operations, $output));
     }
 
-    public function runProvider(): \Generator
+    public static function runProvider(): \Generator
     {
         $daysOld = 4;
 
