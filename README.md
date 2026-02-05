@@ -29,7 +29,7 @@ Important: If referenced email is ever switched back to published, the contacts 
 ```
 bin/console leuchtfeuer:housekeeping
 ```
-By default, entries older than 365 days are deleted from the CampaignLeadEventLog, LeadEventLog, EmailStats (only email_stats entries that referenced emails entry is currently not published) and EmailStatsDevices tables.
+By default, entries older than 365 days are deleted from the CampaignLeadEventLog, LeadEventLog, EmailStats (only email_stats entries that referenced emails entry is currently not published), EmailStatsDevices and PageHit tables.
 
 ### Parameter
 ```
