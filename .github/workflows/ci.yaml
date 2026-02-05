@@ -1,37 +1,131 @@
-name: Continous Integration
+name: Mautic Plugin tests
+
 on:
   push:
     branches:
-      - main
-      - 'MTC\-[0-9]+'
+      - 'mautic6'
+
   pull_request:
 
+env:
+  PLUGIN_DIR: plugins/LeuchtfeuerHousekeepingBundle
+
 jobs:
-  integration:
-    name: Integration tests
-    runs-on: ubuntu-22.04
+  phpunit:
+    runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        php-version: [ 8.1 ]
+        include:
+          - php-versions: '8.1'
+            mautic-versions: '5.2'
+          - php-versions: '8.1'
+            mautic-versions: '6.0'
+          - php-versions: '8.2'
+            mautic-versions: '6.0'
+          - php-versions: '8.3'
+            mautic-versions: '6.0'
+          - php-versions: '8.2'
+            mautic-versions: '7.0'
+          - php-versions: '8.3'
+            mautic-versions: '7.0'
+          - php-versions: '8.4'
+            mautic-versions: '7.0'
+
+    name: Tests on PHP ${{ matrix.php-versions }}, MariaDB, Mautic ${{ matrix.mautic-versions }}
+
+    services:
+      database:
+        image: mariadb:10.11
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+          MYSQL_DATABASE: mautictest
+        ports:
+          - 3306
+        options: >-
+          --shm-size=2gb
+          --name=mariadb
+          --tmpfs=/var/lib/mysql
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
     steps:
-      - name: Checkout
+      - name: Checkout Mautic
         uses: actions/checkout@v4
-      - name: Setup PHP Environment
+        with:
+          repository: mautic/mautic
+          ref: ${{ matrix.mautic-versions }}
+
+      - name: Checkout this plugin
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.PLUGIN_DIR }}
+
+      - name: Setup PHP, with composer and extensions
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php-version }}
-      - name: Install composer requirements.
-        run: composer install
-      - name: Check PHP CS
-        run: ./vendor/bin/php-cs-fixer fix --config .php-cs-fixer.php --dry-run --using-cache no --show-progress dots -v
-      - name: Test
-        run: ./vendor/bin/phpunit --coverage-cobertura=coverage.xml
-      - name: Code Coverage
-        uses: irongut/CodeCoverageSummary@v1.3.0
+          php-version: ${{ matrix.php-versions }}
+          ini-values: -dpcov.enabled=0, pcov.directory=."
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, mysql, pdo_mysql
+          coverage: pcov
+
+      - name: add MySQL config file
+        run: |
+          mysqldump --version
+          mysqldump --print-defaults
+          cp .github/ci-files/.my.cnf ~/.my.cnf
+          mysqldump --print-defaults
+
+      - name: Set SYMFONY_ENV to test
+        run: |
+          echo "SYMFONY_ENV=test" >> $GITHUB_ENV
+          echo "MAUTIC_ENV=test" >> $GITHUB_ENV
+          echo "MAUTIC_TABLE_PREFIX=mautic_" >> $GITHUB_ENV
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v3
         with:
-          filename: coverage.xml
-          badge: true
-          format: 'markdown'
-          output: 'both'
-      - name: Write to Job Summary
-        run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install
+
+      - name: Install Mautic
+        env:
+          DB_PORT: ${{ job.services.database.ports[3306] }}
+        run: |
+          cp ./.github/ci-files/local.php ./config/local.php
+          php bin/console mautic:install --force http://localhost
+
+      - name: Install Plugins
+        env:
+          DB_PORT: ${{ job.services.database.ports[3306] }}
+        run: php bin/console mautic:plugins:install --env=dev
+
+      - name: Run Code Style check
+        run: bin/php-cs-fixer fix ${{ env.PLUGIN_DIR }} --config=.php-cs-fixer.php -v --dry-run --show-progress=dots --diff
+
+      - name: PHPSTAN
+        run: composer phpstan -- ${{ env.PLUGIN_DIR }}
+
+      - name: Twig Lint
+        run: bin/console lint:twig ${{ env.PLUGIN_DIR }}
+
+      - name: Run PHPUNIT tests
+        env:
+          DB_PORT: ${{ job.services.database.ports[3306] }}
+        run: XDEBUG_MODE=coverage APP_DEBUG=0 php -dpcov.enabled=1 -dpcov.directory=. -dpcov.exclude="~tests|themes|vendor~" bin/phpunit -d memory_limit=1G --bootstrap vendor/autoload.php --configuration ${{ env.PLUGIN_DIR }}/phpunit.xml --coverage-clover=${{ env.PLUGIN_DIR }}/coverage.xml --coverage-text
+
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mautic-logs-php${{ matrix.php-versions }}-${{ matrix.db-types }}-mautic${{ matrix.mautic-versions }}
+          path: var/logs/
