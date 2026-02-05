@@ -15,6 +15,10 @@ class EventLogCleanupTest extends TestCase
 {
     /**
      * @dataProvider runProvider
+     *
+     * @param array<string, bool>                                        $operations
+     * @param array<array{0: string, 1: array<string, int>, 2: array<string, int>}> $queries
+     * @param array<int>                                                 $countRows
      */
     public function testDeleteEventLogEntries(array $operations, array $queries, array $countRows, string $message, bool $dryRun, ?int $campaignId): void
     {

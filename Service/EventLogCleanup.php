@@ -219,7 +219,7 @@ class EventLogCleanup
     }
 
     /**
-     * @param non-empty-array<string, int> $result
+     * @param array<string, int> $result
      */
     private function generateMessage(array $result, string $postfix): string
     {
@@ -272,6 +272,9 @@ class EventLogCleanup
         }
     }
 
+    /**
+     * @return array<string>
+     */
     private function getAllTables(): array
     {
         $sql       = 'SHOW TABLES';

@@ -135,6 +135,9 @@ final class FixtureHelper
         return $email;
     }
 
+    /**
+     * @param array<string, mixed>|null $tokens
+     */
     public function createEmailStat(
         Lead $lead,
         ?Email $email,
