@@ -7,8 +7,6 @@ namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Tests\Functional;
 use Mautic\CampaignBundle\Entity\LeadEventLog as CampaignLeadEventLog;
 use Mautic\CoreBundle\Test\MauticMysqlTestCase;
 use Mautic\EmailBundle\Entity\Stat as EmailStat;
-use Mautic\EmailBundle\Entity\StatDevice;
-use Mautic\LeadBundle\Entity\Lead;
 use Mautic\LeadBundle\Entity\LeadEventLog;
 use Mautic\PageBundle\Entity\Hit;
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Tests\Fixtures\FixtureHelper;
@@ -297,7 +295,7 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
             '--days-old'   => 30,
-            '--page-hits' => true,
+            '--page-hits'  => true,
         ]);
 
         $this->em->clear();
@@ -321,7 +319,7 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $stat  = $this->fixtureHelper->createEmailStat($contact, $email, $oldDate, ['token1' => 'value1', 'token2' => 'value2']);
 
         $commandTester = $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
-            '--days-old'          => 30,
+            '--days-old'           => 30,
             '--email-stats-tokens' => true,
         ]);
 
@@ -400,9 +398,9 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->fixtureHelper->createEmailStat($contact, $email, $oldDate, ['token1' => 'value1']);
 
         $commandTester = $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
-            '--days-old'          => 30,
+            '--days-old'           => 30,
             '--email-stats-tokens' => true,
-            '--dry-run'           => true,
+            '--dry-run'            => true,
         ]);
 
         $this->em->clear();

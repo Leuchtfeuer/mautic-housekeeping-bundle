@@ -57,7 +57,7 @@ final class FixtureHelper
         string $name = 'Test Event',
         string $type = 'lead.leadlist',
         string $eventType = 'action',
-        ?Event $parent = null
+        ?Event $parent = null,
     ): Event {
         $event = new Event();
         $event->setCampaign($campaign);
@@ -90,7 +90,7 @@ final class FixtureHelper
         Campaign $campaign,
         Event $event,
         \DateTime $dateTriggered,
-        int $rotation = 1
+        int $rotation = 1,
     ): CampaignLeadEventLog {
         $log = new CampaignLeadEventLog();
         $log->setLead($lead);
@@ -139,7 +139,7 @@ final class FixtureHelper
         Lead $lead,
         ?Email $email,
         \DateTime $dateSent,
-        ?array $tokens = null
+        ?array $tokens = null,
     ): EmailStat {
         $stat = new EmailStat();
         $stat->setLead($lead);
