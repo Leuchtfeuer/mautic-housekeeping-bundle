@@ -123,6 +123,9 @@ jobs:
       - name: Twig Lint
         run: bin/console lint:twig ${{ env.PLUGIN_DIR }}
 
+      - name: Rector
+        run: composer rector -- --dry-run --no-progress-bar ${{ env.PLUGIN_DIR }}
+
       - name: Run PHPUNIT tests
         env:
           DB_PORT: ${{ job.services.database.ports[3306] }}
