@@ -124,6 +124,7 @@ jobs:
         run: bin/console lint:twig ${{ env.PLUGIN_DIR }}
 
       - name: Rector
+        if: ${{ matrix.mautic-versions != '7.0' }} # to be removed after dropping support for M5
         run: composer rector -- --dry-run --no-progress-bar ${{ env.PLUGIN_DIR }}
 
       - name: Run PHPUNIT tests
