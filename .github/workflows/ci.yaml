@@ -19,6 +19,10 @@ jobs:
         include:
           - php-versions: '8.1'
             mautic-versions: '5.2'
+          - php-versions: '8.2'
+            mautic-versions: '5.2'
+          - php-versions: '8.3'
+            mautic-versions: '5.2'
           - php-versions: '8.1'
             mautic-versions: '6.0'
           - php-versions: '8.2'
@@ -32,7 +36,7 @@ jobs:
           - php-versions: '8.4'
             mautic-versions: '7.0'
 
-    name: Tests on PHP ${{ matrix.php-versions }}, MariaDB, Mautic ${{ matrix.mautic-versions }}
+    name: Tests on Mautic ${{ matrix.mautic-versions }}, PHP ${{ matrix.php-versions }}, MariaDB
 
     services:
       database:
