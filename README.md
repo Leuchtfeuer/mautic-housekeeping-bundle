@@ -42,6 +42,7 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 -t  | --email-stats-tokens      | Only set tokens fields in Email Stats Records to NULL instead of deleting the whole record
 -l  | --lead                    | Only entries from the lead_event_log table will be deleted.
 -p  | --page-hits               | Only entries from the page_hits table will be deleted.
+-a  | --aggregate-redirects     | Aggregate duplicate page_redirects entries caused by multiple messenger workers. Consolidates split click statistics per email. Existing tracking URLs continue to work. Cannot be combined with -c, -l, -m, -t, or -p.
 ```
 
 ### Notice

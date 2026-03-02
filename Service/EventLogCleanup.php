@@ -26,6 +26,7 @@ class EventLogCleanup
     public const EMAIL_STATS_TOKENS   = 'email_stats_tokens';
     private const EMAIL_STATS_DEVICES = 'email_stats_devices';
     public const PAGE_HITS            = 'page_hits';
+    public const AGGREGATE_REDIRECTS  = 'aggregate_redirects';
 
     /**
      * @var array<string, string>
@@ -242,6 +243,269 @@ class EventLogCleanup
         }
 
         return $message.$postfix;
+    }
+
+    public function aggregateRedirects(bool $dryRun, OutputInterface $output): string
+    {
+        if (!$this->config->isPublished()) {
+            return 'Housekeeping by Leuchtfeuer is currently not enabled. To use it, please enable the plugin in your Mautic plugin management.';
+        }
+
+        $p = $this->dbPrefix;
+
+        // Phase A: Find duplicate groups (scoped per url + channel + channel_id)
+        $findDuplicatesSql = 'SELECT pr.url, cut.channel, cut.channel_id, '
+            .'MIN(pr.id) as winner_id, '
+            .'GROUP_CONCAT(pr.id ORDER BY pr.id) as all_ids, '
+            .'COUNT(*) as duplicate_count '
+            .'FROM '.$p.'page_redirects pr '
+            .'INNER JOIN '.$p.'channel_url_trackables cut ON cut.redirect_id = pr.id '
+            .'GROUP BY pr.url, cut.channel, cut.channel_id '
+            .'HAVING COUNT(*) > 1';
+
+        if ($output->isVerbose()) {
+            $output->writeln($findDuplicatesSql);
+        }
+
+        $duplicateGroups = $this->connection->executeQuery($findDuplicatesSql)->fetchAllAssociative();
+
+        $totalGroups = count($duplicateGroups);
+        $totalDuplicateRedirects = 0;
+        foreach ($duplicateGroups as $group) {
+            $allIds = array_map('intval', explode(',', (string) $group['all_ids']));
+            $totalDuplicateRedirects += count($allIds) - 1;
+        }
+
+        // Phase B: Count orphan hits (page_hits referencing redirects without trackable entries)
+        $orphanCountSql = 'SELECT COUNT(*) FROM '.$p.'page_hits ph '
+            .'INNER JOIN '.$p.'page_redirects orphan ON ph.redirect_id = orphan.id '
+            .'LEFT JOIN '.$p.'channel_url_trackables cut ON cut.redirect_id = orphan.id '
+            .'INNER JOIN '.$p.'page_redirects winner ON winner.url = orphan.url AND winner.id != orphan.id '
+            .'INNER JOIN '.$p.'channel_url_trackables wcut ON wcut.redirect_id = winner.id '
+            ."AND wcut.channel = 'email' AND wcut.channel_id = ph.email_id "
+            .'WHERE cut.redirect_id IS NULL';
+
+        if ($output->isVerbose()) {
+            $output->writeln($orphanCountSql);
+        }
+
+        $orphanHitCount = (int) $this->connection->executeQuery($orphanCountSql)->fetchOne();
+
+        // Dry run: report counts only
+        if ($dryRun) {
+            if (0 === $totalGroups && 0 === $orphanHitCount) {
+                return 'No duplicate redirects or orphan hits found. This is a dry run.';
+            }
+
+            $parts = [];
+            if ($totalGroups > 0) {
+                $parts[] = $totalGroups.' duplicate redirect groups ('.$totalDuplicateRedirects.' duplicate entries to consolidate)';
+            }
+            if ($orphanHitCount > 0) {
+                $parts[] = $orphanHitCount.' orphan hits to reassign';
+            }
+
+            return 'Found '.implode(' and ', $parts).'. This is a dry run.';
+        }
+
+        // Real run: nothing to do
+        if (0 === $totalGroups && 0 === $orphanHitCount) {
+            return 'No duplicate redirects or orphan hits found. Nothing to do.';
+        }
+
+        $this->connection->beginTransaction();
+
+        try {
+            $mergedGroups = 0;
+
+            // Phase A: Merge each duplicate group
+            foreach ($duplicateGroups as $group) {
+                $winnerId = (int) $group['winner_id'];
+                $allIds = array_map('intval', explode(',', (string) $group['all_ids']));
+                $loserIds = array_values(array_filter($allIds, static fn (int $id): bool => $id !== $winnerId));
+                $channel = (string) $group['channel'];
+                $channelId = (int) $group['channel_id'];
+
+                if (empty($loserIds)) {
+                    continue;
+                }
+
+                // Step 1: Move page_hits from losers to winner
+                $this->connection->executeQuery(
+                    'UPDATE '.$p.'page_hits SET redirect_id = :winnerId WHERE redirect_id IN (:loserIds)',
+                    ['winnerId' => $winnerId, 'loserIds' => $loserIds],
+                    ['winnerId' => \PDO::PARAM_INT, 'loserIds' => Connection::PARAM_INT_ARRAY]
+                );
+
+                // Step 2: Sum trackable stats from losers
+                $trackableStats = $this->connection->executeQuery(
+                    'SELECT COALESCE(SUM(hits), 0) as total_hits, COALESCE(SUM(unique_hits), 0) as total_unique_hits '
+                        .'FROM '.$p.'channel_url_trackables '
+                        .'WHERE redirect_id IN (:loserIds) AND channel = :channel AND channel_id = :channelId',
+                    ['loserIds' => $loserIds, 'channel' => $channel, 'channelId' => $channelId],
+                    ['loserIds' => Connection::PARAM_INT_ARRAY, 'channel' => \PDO::PARAM_STR, 'channelId' => \PDO::PARAM_INT]
+                )->fetchAssociative();
+
+                // Add loser stats to winner's trackable entry
+                $this->connection->executeQuery(
+                    'UPDATE '.$p.'channel_url_trackables SET hits = hits + :addHits, unique_hits = unique_hits + :addUniqueHits '
+                        .'WHERE redirect_id = :winnerId AND channel = :channel AND channel_id = :channelId',
+                    [
+                        'addHits'       => (int) $trackableStats['total_hits'],
+                        'addUniqueHits' => (int) $trackableStats['total_unique_hits'],
+                        'winnerId'      => $winnerId,
+                        'channel'       => $channel,
+                        'channelId'     => $channelId,
+                    ],
+                    [
+                        'addHits'       => \PDO::PARAM_INT,
+                        'addUniqueHits' => \PDO::PARAM_INT,
+                        'winnerId'      => \PDO::PARAM_INT,
+                        'channel'       => \PDO::PARAM_STR,
+                        'channelId'     => \PDO::PARAM_INT,
+                    ]
+                );
+
+                // Step 3: Delete loser trackable entries
+                $this->connection->executeQuery(
+                    'DELETE FROM '.$p.'channel_url_trackables WHERE redirect_id IN (:loserIds) AND channel = :channel AND channel_id = :channelId',
+                    ['loserIds' => $loserIds, 'channel' => $channel, 'channelId' => $channelId],
+                    ['loserIds' => Connection::PARAM_INT_ARRAY, 'channel' => \PDO::PARAM_STR, 'channelId' => \PDO::PARAM_INT]
+                );
+
+                // Step 4: Sum redirect stats from losers
+                $redirectStats = $this->connection->executeQuery(
+                    'SELECT COALESCE(SUM(hits), 0) as total_hits, COALESCE(SUM(unique_hits), 0) as total_unique_hits '
+                        .'FROM '.$p.'page_redirects WHERE id IN (:loserIds)',
+                    ['loserIds' => $loserIds],
+                    ['loserIds' => Connection::PARAM_INT_ARRAY]
+                )->fetchAssociative();
+
+                // Add loser stats to winner's redirect entry
+                $this->connection->executeQuery(
+                    'UPDATE '.$p.'page_redirects SET hits = hits + :addHits, unique_hits = unique_hits + :addUniqueHits WHERE id = :winnerId',
+                    [
+                        'addHits'       => (int) $redirectStats['total_hits'],
+                        'addUniqueHits' => (int) $redirectStats['total_unique_hits'],
+                        'winnerId'      => $winnerId,
+                    ],
+                    [
+                        'addHits'       => \PDO::PARAM_INT,
+                        'addUniqueHits' => \PDO::PARAM_INT,
+                        'winnerId'      => \PDO::PARAM_INT,
+                    ]
+                );
+
+                // Step 5: Zero out loser redirect stats (cosmetic, redirects still work)
+                $this->connection->executeQuery(
+                    'UPDATE '.$p.'page_redirects SET hits = 0, unique_hits = 0 WHERE id IN (:loserIds)',
+                    ['loserIds' => $loserIds],
+                    ['loserIds' => Connection::PARAM_INT_ARRAY]
+                );
+
+                ++$mergedGroups;
+            }
+
+            // Phase B: Orphan hit cleanup
+            $movedHits = 0;
+            if ($orphanHitCount > 0) {
+                // Collect orphan redirect IDs before reassignment (to zero out stale counters later)
+                $orphanRedirectIds = $this->connection->executeQuery(
+                    'SELECT DISTINCT orphan.id '
+                        .'FROM '.$p.'page_hits ph '
+                        .'INNER JOIN '.$p.'page_redirects orphan ON ph.redirect_id = orphan.id '
+                        .'LEFT JOIN '.$p.'channel_url_trackables cut ON cut.redirect_id = orphan.id '
+                        .'INNER JOIN '.$p.'page_redirects winner ON winner.url = orphan.url AND winner.id != orphan.id '
+                        .'INNER JOIN '.$p.'channel_url_trackables wcut ON wcut.redirect_id = winner.id '
+                        ."AND wcut.channel = 'email' AND wcut.channel_id = ph.email_id "
+                        .'WHERE cut.redirect_id IS NULL'
+                )->fetchFirstColumn();
+
+                // Get orphan hit stats grouped by winner (before reassignment)
+                $orphanStats = $this->connection->executeQuery(
+                    'SELECT winner.id as winner_id, wcut.channel, wcut.channel_id, '
+                        .'COUNT(*) as hit_count, COUNT(DISTINCT ph.lead_id) as unique_count '
+                        .'FROM '.$p.'page_hits ph '
+                        .'INNER JOIN '.$p.'page_redirects orphan ON ph.redirect_id = orphan.id '
+                        .'LEFT JOIN '.$p.'channel_url_trackables cut ON cut.redirect_id = orphan.id '
+                        .'INNER JOIN '.$p.'page_redirects winner ON winner.url = orphan.url AND winner.id != orphan.id '
+                        .'INNER JOIN '.$p.'channel_url_trackables wcut ON wcut.redirect_id = winner.id '
+                        ."AND wcut.channel = 'email' AND wcut.channel_id = ph.email_id "
+                        .'WHERE cut.redirect_id IS NULL '
+                        .'GROUP BY winner.id, wcut.channel, wcut.channel_id'
+                )->fetchAllAssociative();
+
+                // Reassign orphan hits to winners
+                $result = $this->connection->executeQuery(
+                    'UPDATE '.$p.'page_hits ph '
+                        .'INNER JOIN '.$p.'page_redirects orphan ON ph.redirect_id = orphan.id '
+                        .'LEFT JOIN '.$p.'channel_url_trackables cut ON cut.redirect_id = orphan.id '
+                        .'INNER JOIN '.$p.'page_redirects winner ON winner.url = orphan.url AND winner.id != orphan.id '
+                        .'INNER JOIN '.$p.'channel_url_trackables wcut ON wcut.redirect_id = winner.id '
+                        ."AND wcut.channel = 'email' AND wcut.channel_id = ph.email_id "
+                        .'SET ph.redirect_id = winner.id '
+                        .'WHERE cut.redirect_id IS NULL'
+                );
+                $movedHits = $result->rowCount();
+
+                // Update winner stats for moved orphan hits
+                foreach ($orphanStats as $stat) {
+                    $this->connection->executeQuery(
+                        'UPDATE '.$p.'channel_url_trackables SET hits = hits + :addHits, unique_hits = unique_hits + :addUniqueHits '
+                            .'WHERE redirect_id = :winnerId AND channel = :channel AND channel_id = :channelId',
+                        [
+                            'addHits'       => (int) $stat['hit_count'],
+                            'addUniqueHits' => (int) $stat['unique_count'],
+                            'winnerId'      => (int) $stat['winner_id'],
+                            'channel'       => $stat['channel'],
+                            'channelId'     => (int) $stat['channel_id'],
+                        ],
+                        [
+                            'addHits'       => \PDO::PARAM_INT,
+                            'addUniqueHits' => \PDO::PARAM_INT,
+                            'winnerId'      => \PDO::PARAM_INT,
+                            'channel'       => \PDO::PARAM_STR,
+                            'channelId'     => \PDO::PARAM_INT,
+                        ]
+                    );
+
+                    $this->connection->executeQuery(
+                        'UPDATE '.$p.'page_redirects SET hits = hits + :addHits, unique_hits = unique_hits + :addUniqueHits WHERE id = :winnerId',
+                        [
+                            'addHits'       => (int) $stat['hit_count'],
+                            'addUniqueHits' => (int) $stat['unique_count'],
+                            'winnerId'      => (int) $stat['winner_id'],
+                        ],
+                        [
+                            'addHits'       => \PDO::PARAM_INT,
+                            'addUniqueHits' => \PDO::PARAM_INT,
+                            'winnerId'      => \PDO::PARAM_INT,
+                        ]
+                    );
+                }
+
+                // Zero out stale counters on orphan redirects
+                if (!empty($orphanRedirectIds)) {
+                    $this->connection->executeQuery(
+                        'UPDATE '.$p.'page_redirects SET hits = 0, unique_hits = 0 WHERE id IN (:ids)',
+                        ['ids' => array_map('intval', $orphanRedirectIds)],
+                        ['ids' => \Doctrine\DBAL\ArrayParameterType::INTEGER]
+                    );
+                }
+            }
+
+            $this->connection->commit();
+        } catch (\Throwable $throwable) {
+            $this->connection->rollBack();
+            throw $throwable;
+        }
+
+        $message = 'Aggregated '.$mergedGroups.' duplicate redirect groups ('.$totalDuplicateRedirects.' duplicate entries consolidated).';
+        if ($movedHits > 0) {
+            $message .= ' Reassigned '.$movedHits.' orphan hits.';
+        }
+
+        return $message;
     }
 
     public function optimizeTables(OutputInterface $output): string

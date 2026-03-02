@@ -42,6 +42,13 @@ class EventLogCleanupCommand extends Command
                     new InputOption('email-stats-tokens', 't', InputOption::VALUE_NONE, 'Set only tokens fields in Email Stats Records to NULL. Important: This option can not be combined with any "-c", "-l" or "-m" flag in one command. And: If the option flag "-t" is not set, the NULL setting of tokens will not be done with the basis command, so if you just run mautic:leuchtfeuer:housekeeping without a flag)'),
                     new InputOption('cmp-id', 'i', InputOption::VALUE_OPTIONAL, 'Delete only campaign_lead_eventLog for a specific CampaignID. Implies --campaign-lead.', 'none'),
                     new InputOption('optimize-tables', 'o', InputOption::VALUE_NONE, 'Optimize all database tables after cleanup.'),
+                    new InputOption(
+                        'aggregate-redirects',
+                        'a',
+                        InputOption::VALUE_NONE,
+                        'Aggregate duplicate page_redirects entries (caused by multiple messenger workers). '
+                        .'Consolidates split click statistics per email. Safe: existing tracking URLs continue to work.'
+                    ),
                 ]
             )
             ->setHelp(
@@ -76,14 +83,64 @@ class EventLogCleanupCommand extends Command
 
                 Purge only page_hits records
                 <info>php %command.full_name% --page-hits</info>
+
+                Aggregate duplicate page_redirects entries (preview):
+                <info>php %command.full_name% --aggregate-redirects --dry-run</info>
+
+                Aggregate duplicate page_redirects entries:
+                <info>php %command.full_name% --aggregate-redirects</info>
+
+                Aggregate duplicate page_redirects and optimize tables:
+                <info>php %command.full_name% --aggregate-redirects --optimize-tables</info>
                 EOT
             );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $daysOld                              = (int) $input->getOption('days-old');
         $dryRun                               = $input->getOption('dry-run');
+        $aggregateRedirects                   = $input->getOption('aggregate-redirects');
+
+        if ($aggregateRedirects) {
+            $hasCleanupFlag = $input->getOption('campaign-lead')
+                || $input->getOption('lead')
+                || $input->getOption('email-stats')
+                || $input->getOption('email-stats-tokens')
+                || $input->getOption('page-hits')
+                || 'none' !== $input->getOption('cmp-id');
+
+            if ($hasCleanupFlag) {
+                $output->writeln('<error>The "--aggregate-redirects" flag cannot be combined with "-c", "-l", "-m", "-t", "-p", or "-i" flags.</error>');
+
+                return 1;
+            }
+
+            try {
+                $message = $this->eventLogCleanup->aggregateRedirects($dryRun, $output);
+            } catch (\Throwable $e) {
+                $output->writeln(sprintf('<error>Redirect aggregation failed: %s</error>', $e->getMessage()));
+
+                return 1;
+            }
+
+            $output->writeln('<info>'.$message.'<info>');
+
+            $optimizeTables = $input->getOption('optimize-tables');
+            if ($optimizeTables && !$dryRun) {
+                try {
+                    $message = $this->eventLogCleanup->optimizeTables($output);
+                    $output->writeln('<info>'.$message.'<info>');
+                } catch (\Throwable $e) {
+                    $output->writeln(sprintf('<error>Table optimization failed: %s</error>', $e->getMessage()));
+
+                    return 1;
+                }
+            }
+
+            return 0;
+        }
+
+        $daysOld                              = (int) $input->getOption('days-old');
         $campaignId                           = 'none' === $input->getOption('cmp-id') ? null : (int) $input->getOption('cmp-id');
         $operations                           = [
             EventLogCleanup::CAMPAIGN_LEAD_EVENTS => $input->getOption('campaign-lead') || null !== $campaignId,

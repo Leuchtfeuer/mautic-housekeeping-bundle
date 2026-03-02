@@ -75,6 +75,297 @@ class EventLogCleanupTest extends TestCase
         self::assertSame($message, $eventLogCleanup->deleteEventLogEntries(4, $campaignId, $dryRun, $operations, $output));
     }
 
+    public function testAggregateRedirectsPluginNotPublished(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::never())->method('executeQuery');
+
+        $output = $this->createMock(OutputInterface::class);
+
+        $config = $this->createMock(Config::class);
+        $config->method('isPublished')->willReturn(false);
+
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        $eventLogCleanup = new EventLogCleanup($connection, 'prefix_table_', $config, $logger);
+        self::assertSame(
+            'Housekeeping by Leuchtfeuer is currently not enabled. To use it, please enable the plugin in your Mautic plugin management.',
+            $eventLogCleanup->aggregateRedirects(true, $output)
+        );
+    }
+
+    public function testAggregateRedirectsDryRunNoDuplicates(): void
+    {
+        $findDuplicatesResult = $this->createMock(Result::class);
+        $findDuplicatesResult->expects(self::once())->method('fetchAllAssociative')->willReturn([]);
+
+        $orphanCountResult = $this->createMock(Result::class);
+        $orphanCountResult->expects(self::once())->method('fetchOne')->willReturn(0);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(2))
+            ->method('executeQuery')
+            ->willReturnCallback(static function () use (&$findDuplicatesResult, &$orphanCountResult): Result {
+                if (null !== $findDuplicatesResult) {
+                    $result = $findDuplicatesResult;
+                    $findDuplicatesResult = null;
+
+                    return $result;
+                }
+
+                return $orphanCountResult;
+            });
+
+        $output = $this->createMock(OutputInterface::class);
+        $output->method('isVerbose')->willReturn(false);
+
+        $config = $this->createMock(Config::class);
+        $config->method('isPublished')->willReturn(true);
+
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        $eventLogCleanup = new EventLogCleanup($connection, 'prefix_table_', $config, $logger);
+        self::assertSame(
+            'No duplicate redirects or orphan hits found. This is a dry run.',
+            $eventLogCleanup->aggregateRedirects(true, $output)
+        );
+    }
+
+    public function testAggregateRedirectsDryRunWithDuplicates(): void
+    {
+        $findDuplicatesResult = $this->createMock(Result::class);
+        $findDuplicatesResult->expects(self::once())->method('fetchAllAssociative')->willReturn([
+            [
+                'url'             => 'http://example.com',
+                'channel'         => 'email',
+                'channel_id'      => 5,
+                'winner_id'       => 1,
+                'all_ids'         => '1,2,3',
+                'duplicate_count' => 3,
+            ],
+        ]);
+
+        $orphanCountResult = $this->createMock(Result::class);
+        $orphanCountResult->expects(self::once())->method('fetchOne')->willReturn(4);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(2))
+            ->method('executeQuery')
+            ->willReturnCallback(static function () use (&$findDuplicatesResult, &$orphanCountResult): Result {
+                if (null !== $findDuplicatesResult) {
+                    $result = $findDuplicatesResult;
+                    $findDuplicatesResult = null;
+
+                    return $result;
+                }
+
+                return $orphanCountResult;
+            });
+
+        $output = $this->createMock(OutputInterface::class);
+        $output->method('isVerbose')->willReturn(false);
+
+        $config = $this->createMock(Config::class);
+        $config->method('isPublished')->willReturn(true);
+
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        $eventLogCleanup = new EventLogCleanup($connection, 'prefix_table_', $config, $logger);
+        self::assertSame(
+            'Found 1 duplicate redirect groups (2 duplicate entries to consolidate) and 4 orphan hits to reassign. This is a dry run.',
+            $eventLogCleanup->aggregateRedirects(true, $output)
+        );
+    }
+
+    public function testAggregateRedirectsDryRunWithDuplicatesNoOrphans(): void
+    {
+        $findDuplicatesResult = $this->createMock(Result::class);
+        $findDuplicatesResult->expects(self::once())->method('fetchAllAssociative')->willReturn([
+            [
+                'url'             => 'http://example.com/page1',
+                'channel'         => 'email',
+                'channel_id'      => 10,
+                'winner_id'       => 5,
+                'all_ids'         => '5,15,25',
+                'duplicate_count' => 3,
+            ],
+            [
+                'url'             => 'http://example.com/page2',
+                'channel'         => 'email',
+                'channel_id'      => 10,
+                'winner_id'       => 6,
+                'all_ids'         => '6,16',
+                'duplicate_count' => 2,
+            ],
+        ]);
+
+        $orphanCountResult = $this->createMock(Result::class);
+        $orphanCountResult->expects(self::once())->method('fetchOne')->willReturn(0);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(2))
+            ->method('executeQuery')
+            ->willReturnCallback(static function () use (&$findDuplicatesResult, &$orphanCountResult): Result {
+                if (null !== $findDuplicatesResult) {
+                    $result = $findDuplicatesResult;
+                    $findDuplicatesResult = null;
+
+                    return $result;
+                }
+
+                return $orphanCountResult;
+            });
+
+        $output = $this->createMock(OutputInterface::class);
+        $output->method('isVerbose')->willReturn(false);
+
+        $config = $this->createMock(Config::class);
+        $config->method('isPublished')->willReturn(true);
+
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        $eventLogCleanup = new EventLogCleanup($connection, 'prefix_table_', $config, $logger);
+        self::assertSame(
+            'Found 2 duplicate redirect groups (3 duplicate entries to consolidate). This is a dry run.',
+            $eventLogCleanup->aggregateRedirects(true, $output)
+        );
+    }
+
+    public function testAggregateRedirectsRealRunSingleGroup(): void
+    {
+        $p = 'prefix_table_';
+
+        // Expected queries in order
+        $expectedQueries = [
+            // Query 1: Find duplicates
+            'SELECT pr.url, cut.channel, cut.channel_id, MIN(pr.id) as winner_id, GROUP_CONCAT(pr.id ORDER BY pr.id) as all_ids, COUNT(*) as duplicate_count FROM '.$p.'page_redirects pr INNER JOIN '.$p.'channel_url_trackables cut ON cut.redirect_id = pr.id GROUP BY pr.url, cut.channel, cut.channel_id HAVING COUNT(*) > 1',
+            // Query 2: Count orphans
+            'SELECT COUNT(*) FROM '.$p.'page_hits ph INNER JOIN '.$p.'page_redirects orphan ON ph.redirect_id = orphan.id LEFT JOIN '.$p.'channel_url_trackables cut ON cut.redirect_id = orphan.id INNER JOIN '.$p.'page_redirects winner ON winner.url = orphan.url AND winner.id != orphan.id INNER JOIN '.$p."channel_url_trackables wcut ON wcut.redirect_id = winner.id AND wcut.channel = 'email' AND wcut.channel_id = ph.email_id WHERE cut.redirect_id IS NULL",
+            // Query 3: UPDATE page_hits (move hits to winner)
+            'UPDATE '.$p.'page_hits SET redirect_id = :winnerId WHERE redirect_id IN (:loserIds)',
+            // Query 4: SELECT trackable stats from losers
+            'SELECT COALESCE(SUM(hits), 0) as total_hits, COALESCE(SUM(unique_hits), 0) as total_unique_hits FROM '.$p.'channel_url_trackables WHERE redirect_id IN (:loserIds) AND channel = :channel AND channel_id = :channelId',
+            // Query 5: UPDATE trackable stats on winner
+            'UPDATE '.$p.'channel_url_trackables SET hits = hits + :addHits, unique_hits = unique_hits + :addUniqueHits WHERE redirect_id = :winnerId AND channel = :channel AND channel_id = :channelId',
+            // Query 6: DELETE loser trackable entries
+            'DELETE FROM '.$p.'channel_url_trackables WHERE redirect_id IN (:loserIds) AND channel = :channel AND channel_id = :channelId',
+            // Query 7: SELECT redirect stats from losers
+            'SELECT COALESCE(SUM(hits), 0) as total_hits, COALESCE(SUM(unique_hits), 0) as total_unique_hits FROM '.$p.'page_redirects WHERE id IN (:loserIds)',
+            // Query 8: UPDATE redirect stats on winner
+            'UPDATE '.$p.'page_redirects SET hits = hits + :addHits, unique_hits = unique_hits + :addUniqueHits WHERE id = :winnerId',
+            // Query 9: Zero out loser redirect stats
+            'UPDATE '.$p.'page_redirects SET hits = 0, unique_hits = 0 WHERE id IN (:loserIds)',
+        ];
+
+        // Result mocks for each query
+        $findDuplicatesResult = $this->createMock(Result::class);
+        $findDuplicatesResult->expects(self::once())->method('fetchAllAssociative')->willReturn([
+            [
+                'url'             => 'http://test.com',
+                'channel'         => 'email',
+                'channel_id'      => 7,
+                'winner_id'       => 10,
+                'all_ids'         => '10,20',
+                'duplicate_count' => 2,
+            ],
+        ]);
+
+        $orphanCountResult = $this->createMock(Result::class);
+        $orphanCountResult->expects(self::once())->method('fetchOne')->willReturn(0);
+
+        $trackableStatsResult = $this->createMock(Result::class);
+        $trackableStatsResult->expects(self::once())->method('fetchAssociative')->willReturn([
+            'total_hits'        => 5,
+            'total_unique_hits' => 3,
+        ]);
+
+        $redirectStatsResult = $this->createMock(Result::class);
+        $redirectStatsResult->expects(self::once())->method('fetchAssociative')->willReturn([
+            'total_hits'        => 8,
+            'total_unique_hits' => 4,
+        ]);
+
+        $voidResult = $this->createMock(Result::class);
+
+        $resultMap = [
+            $findDuplicatesResult,
+            $orphanCountResult,
+            $voidResult, // UPDATE page_hits
+            $trackableStatsResult,
+            $voidResult, // UPDATE trackable stats
+            $voidResult, // DELETE trackables
+            $redirectStatsResult,
+            $voidResult, // UPDATE redirect stats
+            $voidResult, // Zero out losers
+        ];
+
+        $queryIndex = 0;
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(9))
+            ->method('executeQuery')
+            ->willReturnCallback(function (string $sql) use (&$queryIndex, $expectedQueries, $resultMap): Result {
+                self::assertSame($expectedQueries[$queryIndex], $sql, 'Query #'.($queryIndex + 1).' mismatch');
+                $result = $resultMap[$queryIndex];
+                ++$queryIndex;
+
+                return $result;
+            });
+        $connection->expects(self::once())->method('beginTransaction');
+        $connection->expects(self::once())->method('commit');
+        $connection->expects(self::never())->method('rollBack');
+
+        $output = $this->createMock(OutputInterface::class);
+        $output->method('isVerbose')->willReturn(false);
+
+        $config = $this->createMock(Config::class);
+        $config->method('isPublished')->willReturn(true);
+
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        $eventLogCleanup = new EventLogCleanup($connection, $p, $config, $logger);
+        self::assertSame(
+            'Aggregated 1 duplicate redirect groups (1 duplicate entries consolidated).',
+            $eventLogCleanup->aggregateRedirects(false, $output)
+        );
+    }
+
+    public function testAggregateRedirectsRealRunNothingToDo(): void
+    {
+        $findDuplicatesResult = $this->createMock(Result::class);
+        $findDuplicatesResult->expects(self::once())->method('fetchAllAssociative')->willReturn([]);
+
+        $orphanCountResult = $this->createMock(Result::class);
+        $orphanCountResult->expects(self::once())->method('fetchOne')->willReturn(0);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(2))->method('executeQuery')
+            ->willReturnCallback(static function () use (&$findDuplicatesResult, &$orphanCountResult): Result {
+                if (null !== $findDuplicatesResult) {
+                    $result = $findDuplicatesResult;
+                    $findDuplicatesResult = null;
+
+                    return $result;
+                }
+
+                return $orphanCountResult;
+            });
+        $connection->expects(self::never())->method('beginTransaction');
+
+        $output = $this->createMock(OutputInterface::class);
+        $output->method('isVerbose')->willReturn(false);
+
+        $config = $this->createMock(Config::class);
+        $config->method('isPublished')->willReturn(true);
+
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        $eventLogCleanup = new EventLogCleanup($connection, 'prefix_table_', $config, $logger);
+        self::assertSame(
+            'No duplicate redirects or orphan hits found. Nothing to do.',
+            $eventLogCleanup->aggregateRedirects(false, $output)
+        );
+    }
+
     public static function runProvider(): \Generator
     {
         $daysOld = 4;
