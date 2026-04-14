@@ -694,6 +694,233 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         Assert::assertNotNull($stats[0]->getEmail());
     }
 
+    // ========== Exclude Emails Tests ==========
+
+    public function testExcludeEmailsPreservesSpecificEmailStats(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('exclude-stats@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        $excludedEmail = $this->fixtureHelper->createEmail('Excluded Email', false);
+        $otherEmail    = $this->fixtureHelper->createEmail('Other Unpublished Email', false);
+
+        $this->fixtureHelper->createEmailStat($contact, $excludedEmail, $oldDate);
+        $this->fixtureHelper->createEmailStat($contact, $otherEmail, $oldDate);
+
+        $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'       => 30,
+            '--email-stats'    => true,
+            '--exclude-emails' => (string) $excludedEmail->getId(),
+        ]);
+
+        $this->em->clear();
+
+        // Only the excluded email stat should remain
+        $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
+        Assert::assertCount(1, $stats);
+        Assert::assertEquals($excludedEmail->getId(), $stats[0]->getEmail()->getId());
+    }
+
+    public function testExcludeEmailsPreservesTokensForSpecificEmails(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('exclude-tokens@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        $excludedEmail = $this->fixtureHelper->createEmail('Excluded Tokens Email', true);
+        $otherEmail    = $this->fixtureHelper->createEmail('Other Tokens Email', true);
+
+        $excludedStat = $this->fixtureHelper->createEmailStat($contact, $excludedEmail, $oldDate, ['token1' => 'value1']);
+        $otherStat    = $this->fixtureHelper->createEmailStat($contact, $otherEmail, $oldDate, ['token2' => 'value2']);
+
+        $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'           => 30,
+            '--email-stats-tokens' => true,
+            '--exclude-emails'     => (string) $excludedEmail->getId(),
+        ]);
+
+        $this->em->clear();
+
+        $allStats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
+        Assert::assertCount(2, $allStats);
+
+        $statsById = [];
+        foreach ($allStats as $stat) {
+            $statsById[$stat->getEmail()->getId()] = $stat;
+        }
+
+        // Excluded email tokens should remain intact
+        Assert::assertNotNull($statsById[$excludedEmail->getId()]->getTokens());
+        // Other email tokens should be nullified
+        Assert::assertNull($statsById[$otherEmail->getId()]->getTokens());
+    }
+
+    public function testExcludeEmailsPreservesDevicesForSpecificEmails(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('exclude-devices@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        $excludedEmail = $this->fixtureHelper->createEmail('Excluded Devices Email', false);
+        $otherEmail    = $this->fixtureHelper->createEmail('Other Devices Email', false);
+
+        $excludedStat = $this->fixtureHelper->createEmailStat($contact, $excludedEmail, $oldDate);
+        $otherStat    = $this->fixtureHelper->createEmailStat($contact, $otherEmail, $oldDate);
+        $this->fixtureHelper->createEmailStatDevice($excludedStat, $oldDate);
+        $this->fixtureHelper->createEmailStatDevice($otherStat, $oldDate);
+
+        $commandTester = $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'       => 30,
+            '--email-stats'    => true,
+            '--exclude-emails' => (string) $excludedEmail->getId(),
+        ]);
+
+        $this->em->clear();
+
+        // Excluded email stat (and device) should remain; other should be deleted
+        $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
+        Assert::assertCount(1, $stats);
+        Assert::assertEquals($excludedEmail->getId(), $stats[0]->getEmail()->getId());
+
+        // The output should mention email_stats_devices were deleted
+        $output = $commandTester->getDisplay();
+        Assert::assertStringContainsString('email_stats_devices', $output);
+    }
+
+    public function testExcludeEmailsAcceptsMultipleIds(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('exclude-multi@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        $email1 = $this->fixtureHelper->createEmail('Excluded Email 1', false);
+        $email2 = $this->fixtureHelper->createEmail('Excluded Email 2', false);
+        $email3 = $this->fixtureHelper->createEmail('To Be Deleted Email', false);
+
+        $this->fixtureHelper->createEmailStat($contact, $email1, $oldDate);
+        $this->fixtureHelper->createEmailStat($contact, $email2, $oldDate);
+        $this->fixtureHelper->createEmailStat($contact, $email3, $oldDate);
+
+        $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'       => 30,
+            '--email-stats'    => true,
+            '--exclude-emails' => $email1->getId().','.$email2->getId(),
+        ]);
+
+        $this->em->clear();
+
+        // email1 and email2 stats should remain; email3 should be deleted
+        $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
+        Assert::assertCount(2, $stats);
+
+        $emailIds = array_map(static fn (EmailStat $s): int => $s->getEmail()->getId(), $stats);
+        Assert::assertContains($email1->getId(), $emailIds);
+        Assert::assertContains($email2->getId(), $emailIds);
+        Assert::assertNotContains($email3->getId(), $emailIds);
+    }
+
+    public function testExcludeEmailsHasNoEffectOnNonEmailOperations(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('exclude-no-effect@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        $this->fixtureHelper->createLeadEventLog($contact, $oldDate);
+
+        $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'       => 30,
+            '--lead'           => true,
+            '--exclude-emails' => '999',
+        ]);
+
+        $this->em->clear();
+
+        // lead_event_log should still be deleted (--exclude-emails does not affect it)
+        Assert::assertCount(0, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+    }
+
+    public function testExcludeEmailsWithInvalidInputIsIgnored(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $commandTester = $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'       => 30,
+            '--email-stats'    => true,
+            '--exclude-emails' => 'abc,xyz',
+        ]);
+
+        $output = $commandTester->getDisplay();
+        Assert::assertStringContainsString('Warning: --exclude-emails contained no valid IDs', $output);
+        Assert::assertEquals(0, $commandTester->getStatusCode());
+    }
+
+    public function testExcludeEmailsExtractsValidIdsFromMixedInput(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('exclude-mixed@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        $validEmail   = $this->fixtureHelper->createEmail('Valid Excluded Email', false);
+        $invalidEmail = $this->fixtureHelper->createEmail('Not Excluded Email', false);
+
+        $this->fixtureHelper->createEmailStat($contact, $validEmail, $oldDate);
+        $this->fixtureHelper->createEmailStat($contact, $invalidEmail, $oldDate);
+
+        // Pass mixed valid/invalid IDs — only valid ones should be used
+        $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'       => 30,
+            '--email-stats'    => true,
+            '--exclude-emails' => $validEmail->getId().',abc,xyz',
+        ]);
+
+        $this->em->clear();
+
+        // Only the validEmail stat should remain
+        $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
+        Assert::assertCount(1, $stats);
+        Assert::assertEquals($validEmail->getId(), $stats[0]->getEmail()->getId());
+    }
+
+    public function testExcludeEmailsDryRunShowsCorrectCounts(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('exclude-dryrun@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        $excludedEmail = $this->fixtureHelper->createEmail('Excluded Dry Run Email', false);
+        $otherEmail    = $this->fixtureHelper->createEmail('Other Dry Run Email', false);
+
+        $this->fixtureHelper->createEmailStat($contact, $excludedEmail, $oldDate);
+        $this->fixtureHelper->createEmailStat($contact, $otherEmail, $oldDate);
+
+        $commandTester = $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'       => 30,
+            '--email-stats'    => true,
+            '--dry-run'        => true,
+            '--exclude-emails' => (string) $excludedEmail->getId(),
+        ]);
+
+        $this->em->clear();
+
+        // Both stats should remain (dry run)
+        $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
+        Assert::assertCount(2, $stats);
+
+        // Only 1 row would have been deleted (the non-excluded one)
+        $output = $commandTester->getDisplay();
+        Assert::assertStringContainsString('1 email_stats', $output);
+        Assert::assertStringContainsString('would have been deleted', $output);
+        Assert::assertStringContainsString('This is a dry run', $output);
+    }
+
     // ========== Edge Case Tests ==========
 
     public function testNoRecordsToDelete(): void

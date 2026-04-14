@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Service;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config;
 use Psr\Log\LoggerInterface;
@@ -107,8 +108,9 @@ class EventLogCleanup
 
     /**
      * @param non-empty-array<string, bool> $operations
+     * @param list<int>|null                $excludeEmailIds
      */
-    public function deleteEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, array $operations, OutputInterface $output): string
+    public function deleteEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, array $operations, OutputInterface $output, ?array $excludeEmailIds = null): string
     {
         if (!$this->config->isPublished()) {
             return 'Housekeeping by Leuchtfeuer is currently not enabled. To use it, please enable the plugin in your Mautic plugin management.';
@@ -130,6 +132,26 @@ class EventLogCleanup
             unset($operations[self::EMAIL_STATS]);
             $operations[self::EMAIL_STATS_DEVICES] = true;
             $operations[self::EMAIL_STATS]         = true;
+        }
+
+        if (null !== $excludeEmailIds && [] !== $excludeEmailIds) {
+            if ($operations[self::EMAIL_STATS] ?? false) {
+                $this->queriesTemplate[self::EMAIL_STATS] .= ' AND '.self::PREFIX.'email_stats.email_id NOT IN (:excludeEmailIds)';
+                $this->params[self::EMAIL_STATS]['excludeEmailIds'] = $excludeEmailIds;
+                $this->types[self::EMAIL_STATS]['excludeEmailIds']  = ArrayParameterType::INTEGER;
+            }
+
+            if ($operations[self::EMAIL_STATS_TOKENS] ?? false) {
+                $this->queriesTemplate[self::EMAIL_STATS_TOKENS] .= ' AND '.self::PREFIX.'email_stats.email_id NOT IN (:excludeEmailIds)';
+                $this->params[self::EMAIL_STATS_TOKENS]['excludeEmailIds'] = $excludeEmailIds;
+                $this->types[self::EMAIL_STATS_TOKENS]['excludeEmailIds']  = ArrayParameterType::INTEGER;
+            }
+
+            if ($operations[self::EMAIL_STATS_DEVICES] ?? false) {
+                $this->queriesTemplate[self::EMAIL_STATS_DEVICES] .= ' AND '.self::PREFIX.'email_stats_devices.stat_id NOT IN (SELECT id FROM '.self::PREFIX.'email_stats WHERE email_id IN (:excludeEmailIds))';
+                $this->params[self::EMAIL_STATS_DEVICES]['excludeEmailIds'] = $excludeEmailIds;
+                $this->types[self::EMAIL_STATS_DEVICES]['excludeEmailIds']  = ArrayParameterType::INTEGER;
+            }
         }
 
         $result = [
