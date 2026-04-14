@@ -7,6 +7,7 @@ namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Tests\Functional;
 use Mautic\CampaignBundle\Entity\LeadEventLog as CampaignLeadEventLog;
 use Mautic\CoreBundle\Test\MauticMysqlTestCase;
 use Mautic\EmailBundle\Entity\Stat as EmailStat;
+use Mautic\EmailBundle\Entity\StatDevice;
 use Mautic\LeadBundle\Entity\LeadEventLog;
 use Mautic\PageBundle\Entity\Hit;
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Tests\Fixtures\FixtureHelper;
@@ -87,6 +88,9 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         // Email stats should be deleted for unpublished emails
         $emailStats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
         Assert::assertCount(0, $emailStats);
+
+        // Email stat device should also be deleted (stat was for unpublished email)
+        Assert::assertCount(0, $this->em->getRepository(StatDevice::class)->findBy(['stat' => $stat->getId()]));
 
         // Tokens should NOT be affected (default behavior excludes tokens)
         $output = $commandTester->getDisplay();
@@ -275,6 +279,7 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         Assert::assertCount(0, $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]));
 
         // Email stat devices should also be deleted
+        Assert::assertCount(0, $this->em->getRepository(StatDevice::class)->findBy(['stat' => $stat->getId()]));
         $output = $commandTester->getDisplay();
         Assert::assertStringContainsString('email_stats_devices', $output);
 
@@ -785,6 +790,10 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
         Assert::assertCount(1, $stats);
         Assert::assertEquals($excludedEmail->getId(), $stats[0]->getEmail()->getId());
+
+        // Excluded stat device should remain; other stat device should be deleted
+        Assert::assertCount(1, $this->em->getRepository(StatDevice::class)->findBy(['stat' => $excludedStat->getId()]));
+        Assert::assertCount(0, $this->em->getRepository(StatDevice::class)->findBy(['stat' => $otherStat->getId()]));
 
         // The output should mention email_stats_devices were deleted
         $output = $commandTester->getDisplay();
