@@ -42,6 +42,7 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 -t  | --email-stats-tokens      | Only set tokens fields in Email Stats Records to NULL instead of deleting the whole record
 -l  | --lead                    | Only entries from the lead_event_log table will be deleted.
 -p  | --page-hits               | Only entries from the page_hits table will be deleted.
+    | --exclude-emails          | Exclude specific email IDs from event log cleanup. Accepts comma-separated list of email IDs (e.g., 1,44,61). Works with --email-stats and --email-stats-tokens.
 ```
 
 ### Notice
