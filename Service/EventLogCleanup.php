@@ -48,7 +48,7 @@ class EventLogCleanup
     ];
 
     /**
-     * @var array<string, array<string, int>>
+     * @var array<string, array<string, int|list<int>>>
      */
     private array $params = [
         self::CAMPAIGN_LEAD_EVENTS => [
