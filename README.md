@@ -4,7 +4,7 @@
 This plugin provides a Mautic Housekeeping Command for database cleanup purposes.
 
 ## Requirements / Version Support
-- Mautic 6.0
+- Mautic 5.0 - 7.2.1
 - PHP 8.1 or higher
 
 ## Installation
