@@ -11,9 +11,8 @@ use Mautic\EmailBundle\Entity\StatDevice;
 use Mautic\LeadBundle\Entity\LeadEventLog;
 use Mautic\PageBundle\Entity\Hit;
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Tests\Fixtures\FixtureHelper;
-use PHPUnit\Framework\Assert;
 
-class EventLogCleanupCommandTest extends MauticMysqlTestCase
+final class EventLogCleanupCommandTest extends MauticMysqlTestCase
 {
     protected $useCleanupRollback = false;
 
@@ -35,7 +34,7 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         ]);
 
         $output = $commandTester->getDisplay();
-        Assert::assertStringContainsString('Housekeeping by Leuchtfeuer is currently not enabled', $output);
+        $this->assertStringContainsString('Housekeeping by Leuchtfeuer is currently not enabled', $output);
     }
 
     // ========== Default Behavior Tests ==========
@@ -81,20 +80,20 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->em->clear();
 
         // campaign_lead_event_log should have only 1 remaining (the MAX(id) per lead+campaign is preserved)
-        Assert::assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]));
-        Assert::assertCount(0, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
-        Assert::assertCount(0, $this->em->getRepository(Hit::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(0, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(0, $this->em->getRepository(Hit::class)->findBy(['lead' => $contact->getId()]));
 
         // Email stats should be deleted for unpublished emails
         $emailStats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(0, $emailStats);
+        $this->assertCount(0, $emailStats);
 
         // Email stat device should also be deleted (stat was for unpublished email)
-        Assert::assertCount(0, $this->em->getRepository(StatDevice::class)->findBy(['stat' => $stat->getId()]));
+        $this->assertCount(0, $this->em->getRepository(StatDevice::class)->findBy(['stat' => $stat->getId()]));
 
         // Tokens should NOT be affected (default behavior excludes tokens)
         $output = $commandTester->getDisplay();
-        Assert::assertStringNotContainsString('email_stats_tokens', $output);
+        $this->assertStringNotContainsString('email_stats_tokens', $output);
     }
 
     public function testDaysOldDefaultIs365(): void
@@ -117,7 +116,7 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Only one record should remain (the 364 day old one)
         $logs = $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(1, $logs);
+        $this->assertCount(1, $logs);
     }
 
     // ========== Days-Old Parameter Tests ==========
@@ -145,7 +144,7 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Only one record should remain (the 25 day old one)
         $logs = $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(1, $logs);
+        $this->assertCount(1, $logs);
     }
 
     // ========== Dry-Run Tests ==========
@@ -169,7 +168,7 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Record should still exist
         $logs = $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(1, $logs);
+        $this->assertCount(1, $logs);
     }
 
     public function testDryRunShowsCorrectCount(): void
@@ -191,9 +190,9 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         ]);
 
         $output = $commandTester->getDisplay();
-        Assert::assertStringContainsString('3 lead_event_log', $output);
-        Assert::assertStringContainsString('would have been deleted', $output);
-        Assert::assertStringContainsString('This is a dry run', $output);
+        $this->assertStringContainsString('3 lead_event_log', $output);
+        $this->assertStringContainsString('would have been deleted', $output);
+        $this->assertStringContainsString('This is a dry run', $output);
     }
 
     // ========== Individual Table Flag Tests ==========
@@ -220,10 +219,10 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->em->clear();
 
         // campaign_lead_event_log should have 1 remaining (the MAX(id) is preserved)
-        Assert::assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]));
 
         // lead_event_log should still have record
-        Assert::assertCount(1, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(1, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
     }
 
     public function testLeadFlagOnlyAffectsLeadEventLog(): void
@@ -247,10 +246,10 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->em->clear();
 
         // lead_event_log should be empty
-        Assert::assertCount(0, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(0, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
 
         // campaign_lead_event_log should still have record
-        Assert::assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]));
     }
 
     public function testEmailStatsFlagCleansEmailStatsAndDevices(): void
@@ -276,15 +275,15 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->em->clear();
 
         // Email stats should be deleted
-        Assert::assertCount(0, $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(0, $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]));
 
         // Email stat devices should also be deleted
-        Assert::assertCount(0, $this->em->getRepository(StatDevice::class)->findBy(['stat' => $stat->getId()]));
+        $this->assertCount(0, $this->em->getRepository(StatDevice::class)->findBy(['stat' => $stat->getId()]));
         $output = $commandTester->getDisplay();
-        Assert::assertStringContainsString('email_stats_devices', $output);
+        $this->assertStringContainsString('email_stats_devices', $output);
 
         // lead_event_log should still exist
-        Assert::assertCount(1, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(1, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
     }
 
     public function testPageHitsFlagOnlyAffectsPageHits(): void
@@ -306,10 +305,10 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->em->clear();
 
         // Page hits should be deleted
-        Assert::assertCount(0, $this->em->getRepository(Hit::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(0, $this->em->getRepository(Hit::class)->findBy(['lead' => $contact->getId()]));
 
         // lead_event_log should still exist
-        Assert::assertCount(1, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(1, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
     }
 
     public function testEmailStatsTokensFlagOnlySetsTokensToNull(): void
@@ -321,7 +320,7 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Create email stat with tokens
         $email = $this->fixtureHelper->createEmail('Tokens Test Email', true);
-        $stat  = $this->fixtureHelper->createEmailStat($contact, $email, $oldDate, ['token1' => 'value1', 'token2' => 'value2']);
+        $this->fixtureHelper->createEmailStat($contact, $email, $oldDate, ['token1' => 'value1', 'token2' => 'value2']);
 
         $commandTester = $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
             '--days-old'           => 30,
@@ -332,12 +331,12 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Email stat should still exist but tokens should be null
         $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(1, $stats);
-        Assert::assertNull($stats[0]->getTokens());
+        $this->assertCount(1, $stats);
+        $this->assertNull($stats[0]->getTokens());
 
         $output = $commandTester->getDisplay();
-        Assert::assertStringContainsString('email_stats_tokens', $output);
-        Assert::assertStringContainsString('set to NULL', $output);
+        $this->assertStringContainsString('email_stats_tokens', $output);
+        $this->assertStringContainsString('set to NULL', $output);
     }
 
     // ========== Flag Combination Tests ==========
@@ -353,10 +352,10 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         $output = $commandTester->getDisplay();
         // Note: the error message uses curly quotes (")
-        Assert::assertStringContainsString('combination of', $output);
-        Assert::assertStringContainsString('flag', $output);
-        Assert::assertStringContainsString('not supported', $output);
-        Assert::assertEquals(1, $commandTester->getStatusCode());
+        $this->assertStringContainsString('combination of', $output);
+        $this->assertStringContainsString('flag', $output);
+        $this->assertStringContainsString('not supported', $output);
+        $this->assertSame(1, $commandTester->getStatusCode());
     }
 
     public function testTokensFlagCannotCombineWithLead(): void
@@ -370,10 +369,10 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         $output = $commandTester->getDisplay();
         // Note: the error message uses curly quotes (")
-        Assert::assertStringContainsString('combination of', $output);
-        Assert::assertStringContainsString('flag', $output);
-        Assert::assertStringContainsString('not supported', $output);
-        Assert::assertEquals(1, $commandTester->getStatusCode());
+        $this->assertStringContainsString('combination of', $output);
+        $this->assertStringContainsString('flag', $output);
+        $this->assertStringContainsString('not supported', $output);
+        $this->assertSame(1, $commandTester->getStatusCode());
     }
 
     public function testTokensFlagCannotCombineWithEmailStats(): void
@@ -387,10 +386,10 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         $output = $commandTester->getDisplay();
         // Note: the error message uses curly quotes (")
-        Assert::assertStringContainsString('combination of', $output);
-        Assert::assertStringContainsString('flag', $output);
-        Assert::assertStringContainsString('not supported', $output);
-        Assert::assertEquals(1, $commandTester->getStatusCode());
+        $this->assertStringContainsString('combination of', $output);
+        $this->assertStringContainsString('flag', $output);
+        $this->assertStringContainsString('not supported', $output);
+        $this->assertSame(1, $commandTester->getStatusCode());
     }
 
     public function testTokensFlagCanCombineWithDryRun(): void
@@ -412,13 +411,13 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Token should NOT be nullified (dry run)
         $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(1, $stats);
-        Assert::assertNotNull($stats[0]->getTokens());
+        $this->assertCount(1, $stats);
+        $this->assertNotNull($stats[0]->getTokens());
 
         $output = $commandTester->getDisplay();
-        Assert::assertStringContainsString('will be set to NULL', $output);
-        Assert::assertStringContainsString('This is a dry run', $output);
-        Assert::assertEquals(0, $commandTester->getStatusCode());
+        $this->assertStringContainsString('will be set to NULL', $output);
+        $this->assertStringContainsString('This is a dry run', $output);
+        $this->assertSame(0, $commandTester->getStatusCode());
     }
 
     public function testMultipleTableFlagsCanCombine(): void
@@ -445,12 +444,12 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->em->clear();
 
         // campaign_lead_event_log should have 1 remaining (the MAX(id) is preserved)
-        Assert::assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]));
         // lead_event_log should be empty
-        Assert::assertCount(0, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(0, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
 
         // Page hits should still exist (not selected)
-        Assert::assertCount(1, $this->em->getRepository(Hit::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(1, $this->em->getRepository(Hit::class)->findBy(['lead' => $contact->getId()]));
     }
 
     // ========== Campaign ID Filter Tests ==========
@@ -480,10 +479,10 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->em->clear();
 
         // Campaign 1 should have 1 remaining (the MAX(id) is preserved)
-        Assert::assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['campaign' => $campaign1->getId()]));
+        $this->assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['campaign' => $campaign1->getId()]));
 
         // Campaign 2 logs should remain unchanged
-        Assert::assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['campaign' => $campaign2->getId()]));
+        $this->assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['campaign' => $campaign2->getId()]));
     }
 
     public function testCampaignIdImpliesCampaignLeadFlag(): void
@@ -509,10 +508,10 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->em->clear();
 
         // Campaign lead event log should have 1 remaining (the MAX(id) is preserved, --cmp-id implies --campaign-lead)
-        Assert::assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(1, $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]));
 
         // Regular lead event log should remain (only campaign_lead was implied)
-        Assert::assertCount(1, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(1, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
     }
 
     // ========== Preservation Logic Tests ==========
@@ -543,8 +542,8 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Only the latest log (highest ID) should remain
         $logs = $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(1, $logs);
-        Assert::assertEquals($log3->getId(), $logs[0]->getId());
+        $this->assertCount(1, $logs);
+        $this->assertEquals($log3->getId(), $logs[0]->getId());
     }
 
     public function testPreservesLastEventLogWithMultipleEventsNoRotation(): void
@@ -584,8 +583,8 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Only the last log (highest ID) should remain per lead+campaign
         $logs = $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(1, $logs);
-        Assert::assertEquals($lastLog->getId(), $logs[0]->getId());
+        $this->assertCount(1, $logs);
+        $this->assertEquals($lastLog->getId(), $logs[0]->getId());
     }
 
     public function testPreservesLastEventLogForMultipleContactsWithMultipleEvents(): void
@@ -630,12 +629,12 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Each contact should have only their last log remaining
         $logsContact1 = $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact1->getId()]);
-        Assert::assertCount(1, $logsContact1);
-        Assert::assertEquals($lastLogContact1->getId(), $logsContact1[0]->getId());
+        $this->assertCount(1, $logsContact1);
+        $this->assertEquals($lastLogContact1->getId(), $logsContact1[0]->getId());
 
         $logsContact2 = $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact2->getId()]);
-        Assert::assertCount(1, $logsContact2);
-        Assert::assertEquals($lastLogContact2->getId(), $logsContact2[0]->getId());
+        $this->assertCount(1, $logsContact2);
+        $this->assertEquals($lastLogContact2->getId(), $logsContact2[0]->getId());
     }
 
     // ========== Email Stats Rules Tests ==========
@@ -668,8 +667,8 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Only published email stat should remain
         $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(1, $stats);
-        Assert::assertEquals($publishedEmail->getId(), $stats[0]->getEmail()->getId());
+        $this->assertCount(1, $stats);
+        $this->assertEquals($publishedEmail->getId(), $stats[0]->getEmail()->getId());
     }
 
     public function testDeletesEmailStatsWithNullEmailId(): void
@@ -695,8 +694,8 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Orphaned stat should be deleted, published email stat should remain
         $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(1, $stats);
-        Assert::assertNotNull($stats[0]->getEmail());
+        $this->assertCount(1, $stats);
+        $this->assertInstanceOf(\Mautic\EmailBundle\Entity\Email::class, $stats[0]->getEmail());
     }
 
     // ========== Exclude Emails Tests ==========
@@ -724,8 +723,8 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Only the excluded email stat should remain
         $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(1, $stats);
-        Assert::assertEquals($excludedEmail->getId(), $stats[0]->getEmail()->getId());
+        $this->assertCount(1, $stats);
+        $this->assertEquals($excludedEmail->getId(), $stats[0]->getEmail()->getId());
     }
 
     public function testExcludeEmailsPreservesTokensForSpecificEmails(): void
@@ -738,8 +737,8 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $excludedEmail = $this->fixtureHelper->createEmail('Excluded Tokens Email', true);
         $otherEmail    = $this->fixtureHelper->createEmail('Other Tokens Email', true);
 
-        $excludedStat = $this->fixtureHelper->createEmailStat($contact, $excludedEmail, $oldDate, ['token1' => 'value1']);
-        $otherStat    = $this->fixtureHelper->createEmailStat($contact, $otherEmail, $oldDate, ['token2' => 'value2']);
+        $this->fixtureHelper->createEmailStat($contact, $excludedEmail, $oldDate, ['token1' => 'value1']);
+        $this->fixtureHelper->createEmailStat($contact, $otherEmail, $oldDate, ['token2' => 'value2']);
 
         $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
             '--days-old'           => 30,
@@ -750,7 +749,7 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->em->clear();
 
         $allStats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(2, $allStats);
+        $this->assertCount(2, $allStats);
 
         $statsById = [];
         foreach ($allStats as $stat) {
@@ -758,9 +757,9 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         }
 
         // Excluded email tokens should remain intact
-        Assert::assertNotNull($statsById[$excludedEmail->getId()]->getTokens());
+        $this->assertNotNull($statsById[$excludedEmail->getId()]->getTokens());
         // Other email tokens should be nullified
-        Assert::assertNull($statsById[$otherEmail->getId()]->getTokens());
+        $this->assertNull($statsById[$otherEmail->getId()]->getTokens());
     }
 
     public function testExcludeEmailsPreservesDevicesForSpecificEmails(): void
@@ -788,16 +787,16 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Excluded email stat (and device) should remain; other should be deleted
         $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(1, $stats);
-        Assert::assertEquals($excludedEmail->getId(), $stats[0]->getEmail()->getId());
+        $this->assertCount(1, $stats);
+        $this->assertEquals($excludedEmail->getId(), $stats[0]->getEmail()->getId());
 
         // Excluded stat device should remain; other stat device should be deleted
-        Assert::assertCount(1, $this->em->getRepository(StatDevice::class)->findBy(['stat' => $excludedStat->getId()]));
-        Assert::assertCount(0, $this->em->getRepository(StatDevice::class)->findBy(['stat' => $otherStat->getId()]));
+        $this->assertCount(1, $this->em->getRepository(StatDevice::class)->findBy(['stat' => $excludedStat->getId()]));
+        $this->assertCount(0, $this->em->getRepository(StatDevice::class)->findBy(['stat' => $otherStat->getId()]));
 
         // The output should mention email_stats_devices were deleted
         $output = $commandTester->getDisplay();
-        Assert::assertStringContainsString('email_stats_devices', $output);
+        $this->assertStringContainsString('email_stats_devices', $output);
     }
 
     public function testExcludeEmailsAcceptsMultipleIds(): void
@@ -825,12 +824,12 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // email1 and email2 stats should remain; email3 should be deleted
         $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(2, $stats);
+        $this->assertCount(2, $stats);
 
         $emailIds = array_map(static fn (EmailStat $s): int => $s->getEmail()->getId(), $stats);
-        Assert::assertContains($email1->getId(), $emailIds);
-        Assert::assertContains($email2->getId(), $emailIds);
-        Assert::assertNotContains($email3->getId(), $emailIds);
+        $this->assertContains($email1->getId(), $emailIds);
+        $this->assertContains($email2->getId(), $emailIds);
+        $this->assertNotContains($email3->getId(), $emailIds);
     }
 
     public function testExcludeEmailsHasNoEffectOnNonEmailOperations(): void
@@ -851,7 +850,7 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->em->clear();
 
         // lead_event_log should still be deleted (--exclude-emails does not affect it)
-        Assert::assertCount(0, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(0, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
     }
 
     public function testExcludeEmailsWithInvalidInputIsIgnored(): void
@@ -865,8 +864,8 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         ]);
 
         $output = $commandTester->getDisplay();
-        Assert::assertStringContainsString('Warning: --exclude-emails contained no valid IDs', $output);
-        Assert::assertEquals(0, $commandTester->getStatusCode());
+        $this->assertStringContainsString('Warning: --exclude-emails contained no valid IDs', $output);
+        $this->assertSame(0, $commandTester->getStatusCode());
     }
 
     public function testExcludeEmailsExtractsValidIdsFromMixedInput(): void
@@ -893,8 +892,8 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Only the validEmail stat should remain
         $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(1, $stats);
-        Assert::assertEquals($validEmail->getId(), $stats[0]->getEmail()->getId());
+        $this->assertCount(1, $stats);
+        $this->assertEquals($validEmail->getId(), $stats[0]->getEmail()->getId());
     }
 
     public function testExcludeEmailsDryRunShowsCorrectCounts(): void
@@ -921,13 +920,13 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
 
         // Both stats should remain (dry run)
         $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
-        Assert::assertCount(2, $stats);
+        $this->assertCount(2, $stats);
 
         // Only 1 row would have been deleted (the non-excluded one)
         $output = $commandTester->getDisplay();
-        Assert::assertStringContainsString('1 email_stats', $output);
-        Assert::assertStringContainsString('would have been deleted', $output);
-        Assert::assertStringContainsString('This is a dry run', $output);
+        $this->assertStringContainsString('1 email_stats', $output);
+        $this->assertStringContainsString('would have been deleted', $output);
+        $this->assertStringContainsString('This is a dry run', $output);
     }
 
     // ========== Edge Case Tests ==========
@@ -950,11 +949,11 @@ class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->em->clear();
 
         // Record should still exist
-        Assert::assertCount(1, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertCount(1, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
 
         // Command should complete successfully
-        Assert::assertEquals(0, $commandTester->getStatusCode());
+        $this->assertSame(0, $commandTester->getStatusCode());
         $output = $commandTester->getDisplay();
-        Assert::assertStringContainsString('0 lead_event_log', $output);
+        $this->assertStringContainsString('0 lead_event_log', $output);
     }
 }

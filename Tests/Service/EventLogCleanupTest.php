@@ -11,7 +11,7 @@ use MauticPlugin\LeuchtfeuerHousekeepingBundle\Service\EventLogCleanup;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class EventLogCleanupTest extends TestCase
+final class EventLogCleanupTest extends TestCase
 {
     /**
      * @dataProvider runProvider
@@ -25,7 +25,7 @@ class EventLogCleanupTest extends TestCase
         $statements = [];
         foreach ($countRows as $countRow) {
             $statement = $this->createMock(Result::class);
-            $statement->expects(self::once())
+            $statement->expects($this->once())
                 ->method($dryRun ? 'fetchOne' : 'rowCount')
                 ->willReturn($countRow);
 
@@ -33,7 +33,7 @@ class EventLogCleanupTest extends TestCase
         }
 
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::exactly(count($queries)))
+        $connection->expects($this->exactly(count($queries)))
             ->method('executeQuery')
             ->willReturnCallback(static function (string $sql, array $params, array $types) use (&$queries, &$statements): Result {
                 self::assertCount(count($queries), $statements);
@@ -54,10 +54,10 @@ class EventLogCleanupTest extends TestCase
         }
 
         $output = $this->createMock(OutputInterface::class);
-        $output->expects(self::exactly(count($queries)))
+        $output->expects($this->exactly(count($queries)))
             ->method('isVerbose')
             ->willReturn(true);
-        $output->expects(self::exactly(count($queries)))
+        $output->expects($this->exactly(count($queries)))
             ->method('writeln')
             ->willReturnCallback(static function (string $loggedQuery) use (&$loggedQueries): void {
                 $expected = array_shift($loggedQueries);
@@ -69,10 +69,10 @@ class EventLogCleanupTest extends TestCase
         $config->method('isPublished')
             ->willReturn(true);
 
-        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger = $this->createStub(\Psr\Log\LoggerInterface::class);
 
         $eventLogCleanup = new EventLogCleanup($connection, 'prefix_table_', $config, $logger);
-        self::assertSame($message, $eventLogCleanup->deleteEventLogEntries(4, $campaignId, $dryRun, $operations, $output));
+        $this->assertSame($message, $eventLogCleanup->deleteEventLogEntries(4, $campaignId, $dryRun, $operations, $output));
     }
 
     public static function runProvider(): \Generator
