@@ -20,7 +20,6 @@ final class EventLogCleanupTest extends TestCase
      * @param array<array{0: string, 1: array<string, int>, 2: array<string, int>}> $queries
      * @param array<int>                                                            $countRows
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('runProvider')]
     public function testDeleteEventLogEntries(array $operations, array $queries, array $countRows, string $message, bool $dryRun, ?int $campaignId): void
     {
         $statements = [];
