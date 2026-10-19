@@ -3,7 +3,13 @@
 declare(strict_types=1);
 
 use Mautic\CoreBundle\DependencyInjection\MauticCoreExtension;
+use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config;
+use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\HousekeepingLeuchtfeuerIntegration;
+use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Support\ConfigSupport;
+use MauticPlugin\LeuchtfeuerHousekeepingBundle\Service\EventLogCleanup;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+
+use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
 return static function (ContainerConfigurator $configurator): void {
     $services = $configurator->services()
@@ -12,17 +18,27 @@ return static function (ContainerConfigurator $configurator): void {
         ->autoconfigure()
         ->public();
 
-    $services->load('MauticPlugin\\LeuchtfeuerHousekeepingBundle\\', '../')
-        ->exclude('../{'.implode(',', MauticCoreExtension::DEFAULT_EXCLUDES).'}');
+    $excludes = [
+        'Service/EventLogCleanup.php',
+    ];
 
-    $services->get(MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\HousekeepingLeuchtfeuerIntegration::class)
+    $services->load('MauticPlugin\\LeuchtfeuerHousekeepingBundle\\', '../')
+        ->exclude('../{'.implode(',', array_merge(MauticCoreExtension::DEFAULT_EXCLUDES, $excludes)).'}');
+
+    $services->get(HousekeepingLeuchtfeuerIntegration::class)
         ->tag('mautic.integration')
         ->tag('mautic.basic_integration');
-    $services->get(MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Support\ConfigSupport::class)
+    $services->get(ConfigSupport::class)
         ->tag('mautic.config_integration');
 
-    $services->alias('mautic.integration.housekeepingleuchtfeuer', MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\HousekeepingLeuchtfeuerIntegration::class);
+    $services->alias('mautic.integration.housekeepingleuchtfeuer', HousekeepingLeuchtfeuerIntegration::class);
 
-    $eventLogCleanup = $services->get(MauticPlugin\LeuchtfeuerHousekeepingBundle\Service\EventLogCleanup::class);
-    $eventLogCleanup->arg('$dbPrefix', '%mautic.db_table_prefix%');
+    $services->set(EventLogCleanup::class)
+        ->autowire(false)
+        ->args([
+            service('doctrine.dbal.default_connection'),
+            '%mautic.db_table_prefix%',
+            service(Config::class),
+            service('monolog.logger.mautic'),
+        ]);
 };
