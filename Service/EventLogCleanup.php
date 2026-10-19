@@ -13,7 +13,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class EventLogCleanup
 {
     private const PREFIX = '%PREFIX%';
-    private string $dbPrefix;
+    private readonly string $dbPrefix;
 
     /**
      * Constant used to indicate where the query can place "SET a = :a" when query is an update.
@@ -101,7 +101,7 @@ class EventLogCleanup
     private string $dryRunUpdateMessage = ' will be set to NULL.';
     private string $runUpdateMessage    = ' have been set to NULL.';
 
-    public function __construct(private Connection $connection, ?string $dbPrefix, private Config $config, private LoggerInterface $logger)
+    public function __construct(private readonly Connection $connection, ?string $dbPrefix, private readonly Config $config, private readonly LoggerInterface $logger)
     {
         $this->dbPrefix = $dbPrefix ?? '';
     }
@@ -128,7 +128,7 @@ class EventLogCleanup
             $this->queriesTemplate[self::CAMPAIGN_LEAD_EVENTS] .= ' AND campaign_id = :cmpId';
         }
 
-        if (array_key_exists(self::EMAIL_STATS, $operations) && true === $operations[self::EMAIL_STATS]) {
+        if (array_key_exists(self::EMAIL_STATS, $operations) && $operations[self::EMAIL_STATS]) {
             unset($operations[self::EMAIL_STATS]);
             $operations[self::EMAIL_STATS_DEVICES] = true;
             $operations[self::EMAIL_STATS]         = true;
@@ -271,7 +271,7 @@ class EventLogCleanup
         try {
             $tables = $this->getAllTables();
 
-            if (empty($tables)) {
+            if ([] === $tables) {
                 return 'No tables found to optimize.';
             }
 

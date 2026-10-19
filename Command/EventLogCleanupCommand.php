@@ -5,26 +5,28 @@ declare(strict_types=1);
 namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Command;
 
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Service\EventLogCleanup;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
+#[AsCommand(
+    name: 'leuchtfeuer:housekeeping',
+    description: 'Database Cleanup Command to delete lead_event_log table entries, campaign_lead_event_log table entries, email_stats table entries where the referenced email entry is currently not published and email_stats_devices table entries.',
+)]
 class EventLogCleanupCommand extends Command
 {
-    protected static $defaultName = 'leuchtfeuer:housekeeping'; // @phpstan-ignore-line compatibility with Mautic 5
-
     private const DEFAULT_DAYS = 365;
 
-    public function __construct(private EventLogCleanup $eventLogCleanup)
+    public function __construct(private readonly EventLogCleanup $eventLogCleanup)
     {
-        parent::__construct(null);
+        parent::__construct();
     }
 
     protected function configure(): void
     {
-        $this->setName(self::$defaultName) // @phpstan-ignore-line compatibility with Mautic 5
-            ->setDescription('Database Cleanup Command to delete lead_event_log table entries, campaign_lead_event_log table entries, email_stats table entries where the referenced email entry is currently not published and email_stats_devices table entries.')
+        $this
             ->setDefinition(
                 [
                     new InputOption(
@@ -41,7 +43,7 @@ class EventLogCleanupCommand extends Command
                     new InputOption('email-stats', 'm', InputOption::VALUE_NONE, 'Purge only Email Stats Records where the referenced email entry is currently not published and purge Email Stats Devices. Important: If referenced email is ever switched back to published, the contacts will get the email again.'),
                     new InputOption('email-stats-tokens', 't', InputOption::VALUE_NONE, 'Set only tokens fields in Email Stats Records to NULL. Important: This option can not be combined with any "-c", "-l" or "-m" flag in one command. And: If the option flag "-t" is not set, the NULL setting of tokens will not be done with the basis command, so if you just run mautic:leuchtfeuer:housekeeping without a flag)'),
                     new InputOption('cmp-id', 'i', InputOption::VALUE_OPTIONAL, 'Delete only campaign_lead_eventLog for a specific CampaignID. Implies --campaign-lead.', 'none'),
-                    new InputOption('exclude-emails', null, InputOption::VALUE_REQUIRED, 'Comma-separated list of email IDs to exclude from deletion (e.g., 1,44,61). Works with --email-stats and --email-stats-tokens.', null),
+                    new InputOption('exclude-emails', null, InputOption::VALUE_REQUIRED, 'Comma-separated list of email IDs to exclude from deletion (e.g., 1,44,61). Works with --email-stats and --email-stats-tokens.'),
                     new InputOption('optimize-tables', 'o', InputOption::VALUE_NONE, 'Optimize all database tables. If no cleanup flag is set, only the optimization runs and no data is deleted.'),
                 ]
             )
@@ -110,10 +112,10 @@ class EventLogCleanupCommand extends Command
             $operations[EventLogCleanup::EMAIL_STATS_TOKENS] = false;
         }
 
-        if ((true === $operations[EventLogCleanup::EMAIL_STATS_TOKENS]) && (((true === $operations[EventLogCleanup::EMAIL_STATS]) || (true === $operations[EventLogCleanup::CAMPAIGN_LEAD_EVENTS])) || (true === $operations[EventLogCleanup::LEAD_EVENTS]))) {
+        if ((true === $operations[EventLogCleanup::EMAIL_STATS_TOKENS]) && in_array(true, [$operations[EventLogCleanup::EMAIL_STATS], $operations[EventLogCleanup::CAMPAIGN_LEAD_EVENTS], $operations[EventLogCleanup::LEAD_EVENTS]], true)) {
             $output->writeln('<error>The combination of "-t" flag with either "-m" flag or "-c" flag or "-l" flag is not supported/possible. You can only combine the "-t" flag with "-d" flag and/or "-r" flag.</error>');
 
-            return 1;
+            return Command::FAILURE;
         }
 
         if (array_sum($operations) > 0) {
@@ -129,7 +131,7 @@ class EventLogCleanupCommand extends Command
             } catch (\Throwable $e) {
                 $output->writeln(sprintf('<error>Deletion of Log Rows failed because of database error: %s</error>', $e->getMessage()));
 
-                return 1;
+                return Command::FAILURE;
             }
 
             $output->writeln('<info>'.$message.'<info>');
@@ -142,11 +144,11 @@ class EventLogCleanupCommand extends Command
             } catch (\Throwable $e) {
                 $output->writeln(sprintf('<error>Table optimization failed: %s</error>', $e->getMessage()));
 
-                return 1;
+                return Command::FAILURE;
             }
         }
 
-        return 0;
+        return Command::SUCCESS;
     }
 
     /**
