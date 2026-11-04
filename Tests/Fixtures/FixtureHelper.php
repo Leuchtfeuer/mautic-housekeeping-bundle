@@ -104,12 +104,12 @@ final class FixtureHelper
         return $log;
     }
 
-    public function createLeadEventLog(Lead $lead, \DateTime $dateAdded): LeadEventLog
+    public function createLeadEventLog(Lead $lead, \DateTime $dateAdded, string $bundle = 'campaign', string $object = 'action'): LeadEventLog
     {
         $eventLog = new LeadEventLog();
         $eventLog->setLead($lead);
-        $eventLog->setBundle('campaign');
-        $eventLog->setObject('action');
+        $eventLog->setBundle($bundle);
+        $eventLog->setObject($object);
         $eventLog->setAction('triggered');
         $eventLog->setObjectId(1);
         $eventLog->setDateAdded($dateAdded);
