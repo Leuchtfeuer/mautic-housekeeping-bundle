@@ -175,7 +175,7 @@ final class FixtureHelper
         return $statDevice;
     }
 
-    public function createPageHit(Lead $lead, \DateTime $dateHit): Hit
+    public function createPageHit(Lead $lead, \DateTime $dateHit, ?Email $email = null): Hit
     {
         $ipAddress = $this->createIpAddress();
 
@@ -186,6 +186,9 @@ final class FixtureHelper
         $hit->setCode(200);
         $hit->setUrl('https://example.com/test-page');
         $hit->setTrackingId(bin2hex(random_bytes(16)));
+        if (null !== $email) {
+            $hit->setEmail($email);
+        }
         $this->em->persist($hit);
         $this->em->flush();
 

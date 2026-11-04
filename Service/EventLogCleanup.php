@@ -152,6 +152,12 @@ class EventLogCleanup
                 $this->params[self::EMAIL_STATS_DEVICES]['excludeEmailIds'] = $excludeEmailIds;
                 $this->types[self::EMAIL_STATS_DEVICES]['excludeEmailIds']  = ArrayParameterType::INTEGER;
             }
+
+            if ($operations[self::PAGE_HITS] ?? false) {
+                $this->queriesTemplate[self::PAGE_HITS] .= ' AND ('.self::PREFIX.'page_hits.email_id IS NULL OR '.self::PREFIX.'page_hits.email_id NOT IN (:excludeEmailIds))';
+                $this->params[self::PAGE_HITS]['excludeEmailIds'] = $excludeEmailIds;
+                $this->types[self::PAGE_HITS]['excludeEmailIds']  = ArrayParameterType::INTEGER;
+            }
         }
 
         $result = [
