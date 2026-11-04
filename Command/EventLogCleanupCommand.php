@@ -37,6 +37,7 @@ class EventLogCleanupCommand extends Command
                         self::DEFAULT_DAYS
                     ),
                     new InputOption('dry-run', 'r', InputOption::VALUE_NONE, 'Do a dry run without actually deleting anything.'),
+                    new InputOption('batch-size', null, InputOption::VALUE_REQUIRED, 'Process this many rows at a time, each batch committed on its own, instead of one large transaction. Off by default. Has no effect on a dry run.'),
                     new InputOption('campaign-lead', 'c', InputOption::VALUE_NONE, 'Purge only Campaign Lead Event Log Records'),
                     new InputOption('lead', 'l', InputOption::VALUE_NONE, 'Purge only Lead Event Log Records'),
                     new InputOption('page-hits', 'p', InputOption::VALUE_NONE, 'Purge only Hit (page_hit) Records'),
@@ -58,6 +59,9 @@ class EventLogCleanupCommand extends Command
 
                 You can also optionally specify a dry run without deleting any records:
                 <info>php %command.full_name% --days-old=365 --dry-run</info>
+
+                Process large tables in batches, each committed on its own:
+                <info>php %command.full_name% --page-hits --batch-size=5000</info>
 
                 If you run --optimize-tables on its own, with no other cleanup flag, no data is deleted. Only the table optimization runs:
                 <info>php %command.full_name% --optimize-tables</info>
@@ -88,6 +92,14 @@ class EventLogCleanupCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $batchSize = $input->getOption('batch-size');
+
+        if (null !== $batchSize && (!ctype_digit((string) $batchSize) || 0 === (int) $batchSize)) {
+            $output->writeln('<error>--batch-size must be a whole number greater than 0.</error>');
+
+            return Command::FAILURE;
+        }
+
         $daysOld                              = (int) $input->getOption('days-old');
         $dryRun                               = $input->getOption('dry-run');
         $campaignId                           = 'none' === $input->getOption('cmp-id') ? null : (int) $input->getOption('cmp-id');
@@ -126,7 +138,8 @@ class EventLogCleanupCommand extends Command
                     $dryRun,
                     $operations,
                     $output,
-                    $excludeEmails
+                    $excludeEmails,
+                    null === $batchSize ? null : (int) $batchSize
                 );
             } catch (\Throwable $e) {
                 $output->writeln(sprintf('<error>Deletion of Log Rows failed because of database error: %s</error>', $e->getMessage()));
