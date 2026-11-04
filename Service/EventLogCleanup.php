@@ -48,7 +48,7 @@ class EventLogCleanup
     ];
 
     /**
-     * @var array<string, array<string, int|list<int>>>
+     * @var array<string, array<string, int|list<int>|list<string>>>
      */
     private array $params = [
         self::CAMPAIGN_LEAD_EVENTS => [
@@ -101,9 +101,24 @@ class EventLogCleanup
     private string $dryRunUpdateMessage = ' will be set to NULL.';
     private string $runUpdateMessage    = ' have been set to NULL.';
 
+    /**
+     * @var list<string>
+     */
+    private array $leadObjects = [];
+
     public function __construct(private readonly Connection $connection, ?string $dbPrefix, private readonly Config $config, private readonly LoggerInterface $logger)
     {
         $this->dbPrefix = $dbPrefix ?? '';
+    }
+
+    /**
+     * Limits the lead_event_log cleanup to these values of its object column.
+     *
+     * @param list<string> $leadObjects
+     */
+    public function setLeadObjects(array $leadObjects): void
+    {
+        $this->leadObjects = $leadObjects;
     }
 
     /**
@@ -126,6 +141,12 @@ class EventLogCleanup
             $this->params[self::CAMPAIGN_LEAD_EVENTS]['cmpId'] = $campaignId;
             $this->types[self::CAMPAIGN_LEAD_EVENTS]['cmpId']  = \PDO::PARAM_INT;
             $this->queriesTemplate[self::CAMPAIGN_LEAD_EVENTS] .= ' AND campaign_id = :cmpId';
+        }
+
+        if ([] !== $this->leadObjects && ($operations[self::LEAD_EVENTS] ?? false)) {
+            $this->params[self::LEAD_EVENTS]['leadObjects'] = $this->leadObjects;
+            $this->types[self::LEAD_EVENTS]['leadObjects']  = ArrayParameterType::STRING;
+            $this->queriesTemplate[self::LEAD_EVENTS] .= ' AND '.self::PREFIX.'lead_event_log.object IN (:leadObjects)';
         }
 
         if (array_key_exists(self::EMAIL_STATS, $operations) && $operations[self::EMAIL_STATS]) {

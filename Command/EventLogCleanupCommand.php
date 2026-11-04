@@ -39,6 +39,7 @@ class EventLogCleanupCommand extends Command
                     new InputOption('dry-run', 'r', InputOption::VALUE_NONE, 'Do a dry run without actually deleting anything.'),
                     new InputOption('campaign-lead', 'c', InputOption::VALUE_NONE, 'Purge only Campaign Lead Event Log Records'),
                     new InputOption('lead', 'l', InputOption::VALUE_NONE, 'Purge only Lead Event Log Records'),
+                    new InputOption('lead-object', null, InputOption::VALUE_REQUIRED, 'Comma-separated list of lead_event_log objects to purge (e.g., segment,import). All other objects are kept. Implies --lead.'),
                     new InputOption('page-hits', 'p', InputOption::VALUE_NONE, 'Purge only Hit (page_hit) Records'),
                     new InputOption('email-stats', 'm', InputOption::VALUE_NONE, 'Purge only Email Stats Records where the referenced email entry is currently not published and purge Email Stats Devices. Important: If referenced email is ever switched back to published, the contacts will get the email again.'),
                     new InputOption('email-stats-tokens', 't', InputOption::VALUE_NONE, 'Set only tokens fields in Email Stats Records to NULL. Important: This option can not be combined with any "-c", "-l" or "-m" flag in one command. And: If the option flag "-t" is not set, the NULL setting of tokens will not be done with the basis command, so if you just run mautic:leuchtfeuer:housekeeping without a flag)'),
@@ -71,6 +72,9 @@ class EventLogCleanupCommand extends Command
                 Purge only lead_event_log records
                 <info>php %command.full_name% --lead</info>
 
+                Purge only specific objects from lead_event_log and keep the rest:
+                <info>php %command.full_name% --lead-object=segment</info>
+
                 Purge only email_stats where the referenced email entry is currently not published and email_stats_devices records [Important: If referenced email is ever switched back to published, the contacts will get the email again]:
                 <info>php %command.full_name% --email-stats</info>
 
@@ -93,10 +97,17 @@ class EventLogCleanupCommand extends Command
         $campaignId                           = 'none' === $input->getOption('cmp-id') ? null : (int) $input->getOption('cmp-id');
         $excludeEmails                        = $this->parseExcludeEmailIds($input, $output);
         $optimizeTables                       = $input->getOption('optimize-tables');
+        $leadObjects                          = $this->parseLeadObjects($input);
+
+        if ([] === $leadObjects) {
+            $output->writeln('<error>--lead-object needs at least one object name.</error>');
+
+            return Command::FAILURE;
+        }
 
         $operations                           = [
             EventLogCleanup::CAMPAIGN_LEAD_EVENTS => $input->getOption('campaign-lead') || null !== $campaignId,
-            EventLogCleanup::LEAD_EVENTS          => $input->getOption('lead'),
+            EventLogCleanup::LEAD_EVENTS          => $input->getOption('lead') || null !== $leadObjects,
             EventLogCleanup::EMAIL_STATS          => $input->getOption('email-stats'),
             EventLogCleanup::EMAIL_STATS_TOKENS   => $input->getOption('email-stats-tokens'),
             EventLogCleanup::PAGE_HITS            => $input->getOption('page-hits'),
@@ -116,6 +127,10 @@ class EventLogCleanupCommand extends Command
             $output->writeln('<error>The combination of "-t" flag with either "-m" flag or "-c" flag or "-l" flag is not supported/possible. You can only combine the "-t" flag with "-d" flag and/or "-r" flag.</error>');
 
             return Command::FAILURE;
+        }
+
+        if (null !== $leadObjects) {
+            $this->eventLogCleanup->setLeadObjects($leadObjects);
         }
 
         if (array_sum($operations) > 0) {
@@ -185,5 +200,23 @@ class EventLogCleanupCommand extends Command
         }
 
         return array_values($ids);
+    }
+
+    /**
+     * Returns null when the option is not given, and an empty list when it holds no names.
+     *
+     * @return list<string>|null
+     */
+    private function parseLeadObjects(InputInterface $input): ?array
+    {
+        $rawValue = $input->getOption('lead-object');
+
+        if (null === $rawValue) {
+            return null;
+        }
+
+        $objects = array_filter(array_map(trim(...), explode(',', (string) $rawValue)), static fn (string $object): bool => '' !== $object);
+
+        return array_values(array_unique($objects));
     }
 }
