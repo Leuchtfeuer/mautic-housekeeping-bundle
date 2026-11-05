@@ -35,6 +35,7 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 ```
 -d  | --days-old                | Specifies the minimum age of the entries to be deleted. Default: 365 days
 -r  | --dry-run                 | Execute as dry run. No entries will be deleted
+    | --batch-size              | Process this many rows at a time, each batch committed on its own, instead of one large transaction. Off by default.
 -0  | --optimize-tables         | Runs OPTIMIZE TABLE on all Mautic tables. 
 -i  | --cmp-id                  | Delete only data for a specific campaign ID from campaign_lead_event_log
 -c  | --campaign-lead           | Only entries from the campaign_lead_event_log table will be deleted
@@ -49,6 +50,7 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 - Every last entry from the campaign_lead_event_log per campaign will be kept. This is due to contacts restarting campaigns if there is no last step preserved in the log.
 
 ### Deleting huge ammounts of data
+- Use `--batch-size` (for example `--batch-size=5000`), so that each batch is committed on its own. If a run stops, what it already committed stays deleted, and running it again carries on. `--campaign-lead` works out which rows to keep for every batch, so use a larger batch size there.
 - It might happen that the plugin fails to delete if the data is too large to handle. In that case: Create the following bash script and iterate through the deletion day by day:
 ```
 #!/bin/sh

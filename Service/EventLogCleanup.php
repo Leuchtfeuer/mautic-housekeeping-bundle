@@ -110,7 +110,7 @@ class EventLogCleanup
      * @param non-empty-array<string, bool> $operations
      * @param list<int>|null                $excludeEmailIds
      */
-    public function deleteEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, array $operations, OutputInterface $output, ?array $excludeEmailIds = null): string
+    public function deleteEventLogEntries(int $daysOld, ?int $campaignId, bool $dryRun, array $operations, OutputInterface $output, ?array $excludeEmailIds = null, ?int $batchSize = null): string
     {
         if (!$this->config->isPublished()) {
             return 'Housekeeping by Leuchtfeuer is currently not enabled. To use it, please enable the plugin in your Mautic plugin management.';
@@ -163,7 +163,11 @@ class EventLogCleanup
             self::PAGE_HITS            => 0,
         ];
 
-        $this->connection->beginTransaction();
+        $useSingleTransaction = $dryRun || null === $batchSize;
+
+        if ($useSingleTransaction) {
+            $this->connection->beginTransaction();
+        }
 
         if ($dryRun) {
             foreach ($operations as $operation => $enabled) {
@@ -181,6 +185,14 @@ class EventLogCleanup
                 if ($output->isVerbose()) {
                     $output->writeln($sql);
                 }
+            }
+        } elseif (null !== $batchSize) {
+            foreach ($operations as $operation => $enabled) {
+                if (false === $enabled) {
+                    continue;
+                }
+
+                $result[$operation] = $this->runOperationInBatches($operation, $batchSize, $output);
             }
         } else {
             foreach ($operations as $operation => $enabled) {
@@ -205,11 +217,13 @@ class EventLogCleanup
             }
         }
 
-        try {
-            $this->connection->commit();
-        } catch (\Throwable $throwable) {
-            $this->connection->rollBack();
-            throw $throwable;
+        if ($useSingleTransaction) {
+            try {
+                $this->connection->commit();
+            } catch (\Throwable $throwable) {
+                $this->connection->rollBack();
+                throw $throwable;
+            }
         }
 
         $operationsResult = [
@@ -264,6 +278,56 @@ class EventLogCleanup
         }
 
         return $message.$postfix;
+    }
+
+    /**
+     * Deletes or updates the rows of one operation in batches, each committed on its own.
+     * It selects forward by ID, so rows the conditions keep are not read again for every batch.
+     * The write repeats the conditions, so a row that stopped matching after the select stays.
+     */
+    private function runOperationInBatches(string $operation, int $batchSize, OutputInterface $output): int
+    {
+        $table     = $this->dbPrefix.(self::EMAIL_STATS_TOKENS === $operation ? self::EMAIL_STATS : $operation);
+        $idColumn  = $table.'.id';
+        $template  = str_replace(self::PREFIX, $this->dbPrefix, $this->queriesTemplate[$operation]);
+        $selectSql = 'SELECT '.$idColumn.' FROM '.str_replace(self::SET, '', $template).' AND '.$idColumn.' > :lastId ORDER BY '.$idColumn.' LIMIT '.$batchSize;
+        $writeSql  = 'DELETE LOW_PRIORITY '.$table.' FROM '.$template.' AND '.$idColumn.' IN (:batchIds)';
+
+        if (array_key_exists($operation, $this->update)) {
+            $writeSql = 'UPDATE LOW_PRIORITY '.str_replace(self::SET, $this->update[$operation], $template).' AND '.$idColumn.' IN (:batchIds)';
+        }
+
+        if ($output->isVerbose()) {
+            $output->writeln($selectSql);
+            $output->writeln($writeSql);
+        }
+
+        $affectedRows = 0;
+        $lastId       = 0;
+
+        do {
+            $ids = $this->connection->executeQuery(
+                $selectSql,
+                $this->params[$operation] + ['lastId' => $lastId],
+                $this->types[$operation] + ['lastId' => \PDO::PARAM_INT]
+            )->fetchFirstColumn();
+
+            if ([] === $ids) {
+                break;
+            }
+
+            $ids = array_map(intval(...), $ids);
+
+            $affectedRows += $this->connection->executeQuery(
+                $writeSql,
+                $this->params[$operation] + ['batchIds' => $ids],
+                $this->types[$operation] + ['batchIds' => ArrayParameterType::INTEGER]
+            )->rowCount();
+
+            $lastId = max($ids);
+        } while (count($ids) === $batchSize);
+
+        return $affectedRows;
     }
 
     public function optimizeTables(OutputInterface $output): string

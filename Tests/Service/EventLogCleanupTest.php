@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Tests\Service;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config;
@@ -390,5 +391,148 @@ final class EventLogCleanupTest extends TestCase
             false,
             65487,
         ];
+    }
+
+    /**
+     * @dataProvider batchProvider
+     *
+     * @param non-empty-array<string, bool>                                                                       $operations
+     * @param list<array{0: string, 1: array<string, int|list<int>>, 2: array<string, int>, 3: list<string>|int}> $calls
+     */
+    public function testBatchSizeProcessesRowsInBatches(array $operations, array $calls, string $message): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->never())
+            ->method('beginTransaction');
+        $connection->expects($this->never())
+            ->method('commit');
+        $connection->expects($this->exactly(count($calls)))
+            ->method('executeQuery')
+            ->willReturnCallback(function (string $sql, array $params, array $types) use (&$calls): Result {
+                $call = array_shift($calls);
+
+                self::assertSame($call[0], $sql);
+                self::assertSame($call[1], $params);
+                self::assertSame($call[2], $types);
+
+                $result = $this->createMock(Result::class);
+                if (is_array($call[3])) {
+                    $result->method('fetchFirstColumn')
+                        ->willReturn($call[3]);
+                } else {
+                    $result->method('rowCount')
+                        ->willReturn($call[3]);
+                }
+
+                return $result;
+            });
+
+        $this->assertSame(
+            $message,
+            $this->createEventLogCleanup($connection)->deleteEventLogEntries(4, null, false, $operations, $this->createStub(OutputInterface::class), null, 2)
+        );
+    }
+
+    public static function batchProvider(): \Generator
+    {
+        $selectTypes = ['daysOld' => \PDO::PARAM_INT, 'lastId' => \PDO::PARAM_INT];
+        $writeTypes  = ['daysOld' => \PDO::PARAM_INT, 'batchIds' => ArrayParameterType::INTEGER];
+
+        $selectHits = 'SELECT prefix_table_page_hits.id FROM prefix_table_page_hits WHERE date_hit < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND prefix_table_page_hits.id > :lastId ORDER BY prefix_table_page_hits.id LIMIT 2';
+        $deleteHits = 'DELETE LOW_PRIORITY prefix_table_page_hits FROM prefix_table_page_hits WHERE date_hit < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND prefix_table_page_hits.id IN (:batchIds)';
+
+        yield 'stops on a short batch and moves past the last id' => [
+            [EventLogCleanup::PAGE_HITS => true],
+            [
+                [$selectHits, ['daysOld' => 4, 'lastId' => 0], $selectTypes, ['10', '20']],
+                [$deleteHits, ['daysOld' => 4, 'batchIds' => [10, 20]], $writeTypes, 2],
+                [$selectHits, ['daysOld' => 4, 'lastId' => 20], $selectTypes, ['30']],
+                [$deleteHits, ['daysOld' => 4, 'batchIds' => [30]], $writeTypes, 1],
+            ],
+            '3 page_hits rows have been deleted.',
+        ];
+
+        yield 'stops on an empty batch' => [
+            [EventLogCleanup::PAGE_HITS => true],
+            [
+                [$selectHits, ['daysOld' => 4, 'lastId' => 0], $selectTypes, ['10', '20']],
+                [$deleteHits, ['daysOld' => 4, 'batchIds' => [10, 20]], $writeTypes, 2],
+                [$selectHits, ['daysOld' => 4, 'lastId' => 20], $selectTypes, []],
+            ],
+            '2 page_hits rows have been deleted.',
+        ];
+
+        yield 'counts only the rows that still match when written' => [
+            [EventLogCleanup::PAGE_HITS => true],
+            [
+                [$selectHits, ['daysOld' => 4, 'lastId' => 0], $selectTypes, ['10', '20']],
+                [$deleteHits, ['daysOld' => 4, 'batchIds' => [10, 20]], $writeTypes, 1],
+                [$selectHits, ['daysOld' => 4, 'lastId' => 20], $selectTypes, []],
+            ],
+            '1 page_hits rows have been deleted.',
+        ];
+
+        yield 'writes nothing when no row matches' => [
+            [EventLogCleanup::PAGE_HITS => true],
+            [
+                [$selectHits, ['daysOld' => 4, 'lastId' => 0], $selectTypes, []],
+            ],
+            '0 page_hits rows have been deleted.',
+        ];
+
+        yield 'updates tokens by id' => [
+            [EventLogCleanup::EMAIL_STATS_TOKENS => true],
+            [
+                ['SELECT prefix_table_email_stats.id FROM prefix_table_email_stats  WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL AND prefix_table_email_stats.id > :lastId ORDER BY prefix_table_email_stats.id LIMIT 2', ['daysOld' => 4, 'lastId' => 0], $selectTypes, ['7']],
+                ['UPDATE LOW_PRIORITY prefix_table_email_stats SET tokens = NULL WHERE date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND tokens IS NOT NULL AND prefix_table_email_stats.id IN (:batchIds)', ['daysOld' => 4, 'batchIds' => [7]], $writeTypes, 1],
+            ],
+            ' 1 email_stats_tokens have been set to NULL.',
+        ];
+
+        yield 'qualifies the id on the email_stats join and clears devices first' => [
+            [EventLogCleanup::EMAIL_STATS => true],
+            [
+                ['SELECT prefix_table_email_stats_devices.id FROM prefix_table_email_stats_devices WHERE prefix_table_email_stats_devices.date_opened < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND prefix_table_email_stats_devices.id > :lastId ORDER BY prefix_table_email_stats_devices.id LIMIT 2', ['daysOld' => 4, 'lastId' => 0], $selectTypes, []],
+                ['SELECT prefix_table_email_stats.id FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE (prefix_table_emails.is_published = 0 OR prefix_table_emails.publish_down < DATE_SUB(NOW(),INTERVAL :daysOld DAY) OR prefix_table_email_stats.email_id IS NULL) AND prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND prefix_table_email_stats.id > :lastId ORDER BY prefix_table_email_stats.id LIMIT 2', ['daysOld' => 4, 'lastId' => 0], $selectTypes, ['5']],
+                ['DELETE LOW_PRIORITY prefix_table_email_stats FROM prefix_table_email_stats LEFT JOIN prefix_table_emails ON prefix_table_email_stats.email_id = prefix_table_emails.id WHERE (prefix_table_emails.is_published = 0 OR prefix_table_emails.publish_down < DATE_SUB(NOW(),INTERVAL :daysOld DAY) OR prefix_table_email_stats.email_id IS NULL) AND prefix_table_email_stats.date_sent < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND prefix_table_email_stats.id IN (:batchIds)', ['daysOld' => 4, 'batchIds' => [5]], $writeTypes, 1],
+            ],
+            '0 email_stats_devices and 1 email_stats rows have been deleted.',
+        ];
+    }
+
+    public function testBatchSizeIsIgnoredOnDryRun(): void
+    {
+        $statement = $this->createMock(Result::class);
+        $statement->expects($this->once())
+            ->method('fetchOne')
+            ->willReturn(5);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())
+            ->method('beginTransaction');
+        $connection->expects($this->once())
+            ->method('commit');
+        $connection->expects($this->once())
+            ->method('executeQuery')
+            ->with(
+                'SELECT COUNT(1) as cnt FROM prefix_table_page_hits WHERE date_hit < DATE_SUB(NOW(),INTERVAL :daysOld DAY)',
+                ['daysOld' => 4],
+                ['daysOld' => \PDO::PARAM_INT]
+            )
+            ->willReturn($statement);
+
+        $this->assertSame(
+            '5 page_hits rows would have been deleted. This is a dry run.',
+            $this->createEventLogCleanup($connection)->deleteEventLogEntries(4, null, true, [EventLogCleanup::PAGE_HITS => true], $this->createStub(OutputInterface::class), null, 2)
+        );
+    }
+
+    private function createEventLogCleanup(Connection $connection): EventLogCleanup
+    {
+        $config = $this->createMock(Config::class);
+        $config->method('isPublished')
+            ->willReturn(true);
+
+        return new EventLogCleanup($connection, 'prefix_table_', $config, $this->createStub(\Psr\Log\LoggerInterface::class));
     }
 }

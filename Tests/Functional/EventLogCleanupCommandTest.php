@@ -929,6 +929,182 @@ final class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->assertStringContainsString('This is a dry run', $output);
     }
 
+    public function testBatchSizeDeletesEveryMatchingRow(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('batch-delete@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        for ($i = 0; $i < 5; ++$i) {
+            $this->fixtureHelper->createLeadEventLog($contact, $oldDate);
+        }
+
+        $recentLog = $this->fixtureHelper->createLeadEventLog($contact, $this->fixtureHelper->daysAgo(10));
+
+        $commandTester = $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'   => 30,
+            '--lead'       => true,
+            '--batch-size' => 2,
+        ]);
+
+        $this->em->clear();
+
+        $logs = $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]);
+        $this->assertCount(1, $logs);
+        $this->assertEquals($recentLog->getId(), $logs[0]->getId());
+
+        $this->assertStringContainsString('5 lead_event_log', $commandTester->getDisplay());
+        $this->assertSame(0, $commandTester->getStatusCode());
+    }
+
+    public function testBatchSizeMovesPastRowsItKeeps(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('batch-keep@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        $unpublishedEmail = $this->fixtureHelper->createEmail('Batch Unpublished Email', false);
+        $publishedEmail   = $this->fixtureHelper->createEmail('Batch Published Email', true);
+
+        $firstStat = $this->fixtureHelper->createEmailStat($contact, $unpublishedEmail, $oldDate);
+        $keptStat  = $this->fixtureHelper->createEmailStat($contact, $publishedEmail, $oldDate);
+        $lastStat  = $this->fixtureHelper->createEmailStat($contact, $unpublishedEmail, $oldDate);
+        $this->fixtureHelper->createEmailStatDevice($firstStat, $oldDate);
+        $this->fixtureHelper->createEmailStatDevice($lastStat, $oldDate);
+
+        $commandTester = $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'    => 30,
+            '--email-stats' => true,
+            '--batch-size'  => 1,
+        ]);
+
+        $this->em->clear();
+
+        $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
+        $this->assertCount(1, $stats);
+        $this->assertEquals($keptStat->getId(), $stats[0]->getId());
+
+        $output = $commandTester->getDisplay();
+        $this->assertStringContainsString('2 email_stats_devices', $output);
+        $this->assertStringContainsString('2 email_stats', $output);
+    }
+
+    public function testBatchSizeSetsTokensToNull(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('batch-tokens@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+        $email   = $this->fixtureHelper->createEmail('Batch Tokens Email', true);
+
+        for ($i = 0; $i < 3; ++$i) {
+            $this->fixtureHelper->createEmailStat($contact, $email, $oldDate, ['token' => 'value']);
+        }
+
+        $commandTester = $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'           => 30,
+            '--email-stats-tokens' => true,
+            '--batch-size'         => 2,
+        ]);
+
+        $this->em->clear();
+
+        $stats = $this->em->getRepository(EmailStat::class)->findBy(['lead' => $contact->getId()]);
+        $this->assertCount(3, $stats);
+
+        foreach ($stats as $stat) {
+            $this->assertNull($stat->getTokens());
+        }
+
+        $this->assertStringContainsString('3 email_stats_tokens', $commandTester->getDisplay());
+    }
+
+    public function testBatchSizePreservesLastCampaignEventLog(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact  = $this->fixtureHelper->createContact('batch-campaign@test.com');
+        $campaign = $this->fixtureHelper->createCampaign('Batch Campaign');
+        $event    = $this->fixtureHelper->createCampaignEvent($campaign);
+        $oldDate  = $this->fixtureHelper->daysAgo(400);
+
+        $this->fixtureHelper->createCampaignLeadEventLog($contact, $campaign, $event, $oldDate, 1);
+        $this->fixtureHelper->createCampaignLeadEventLog($contact, $campaign, $event, $oldDate, 2);
+        $lastLog = $this->fixtureHelper->createCampaignLeadEventLog($contact, $campaign, $event, $oldDate, 3);
+
+        $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'      => 30,
+            '--campaign-lead' => true,
+            '--batch-size'    => 1,
+        ]);
+
+        $this->em->clear();
+
+        $logs = $this->em->getRepository(CampaignLeadEventLog::class)->findBy(['lead' => $contact->getId()]);
+        $this->assertCount(1, $logs);
+        $this->assertEquals($lastLog->getId(), $logs[0]->getId());
+    }
+
+    public function testBatchSizeDoesNotDeleteOnDryRun(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('batch-dryrun@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        for ($i = 0; $i < 3; ++$i) {
+            $this->fixtureHelper->createLeadEventLog($contact, $oldDate);
+        }
+
+        $commandTester = $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'   => 30,
+            '--lead'       => true,
+            '--dry-run'    => true,
+            '--batch-size' => 2,
+        ]);
+
+        $this->em->clear();
+
+        $this->assertCount(3, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertStringContainsString('3 lead_event_log', $commandTester->getDisplay());
+    }
+
+    /**
+     * @dataProvider invalidBatchSizeProvider
+     */
+    public function testInvalidBatchSizeStopsWithoutDeleting(string $batchSize): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('batch-invalid@test.com');
+        $this->fixtureHelper->createLeadEventLog($contact, $this->fixtureHelper->daysAgo(400));
+
+        $commandTester = $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'   => 30,
+            '--lead'       => true,
+            '--batch-size' => $batchSize,
+        ]);
+
+        $this->em->clear();
+
+        $this->assertCount(1, $this->em->getRepository(LeadEventLog::class)->findBy(['lead' => $contact->getId()]));
+        $this->assertStringContainsString('--batch-size must be a whole number', $commandTester->getDisplay());
+        $this->assertSame(1, $commandTester->getStatusCode());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function invalidBatchSizeProvider(): iterable
+    {
+        yield 'text' => ['abc'];
+        yield 'zero' => ['0'];
+        yield 'negative' => ['-1'];
+        yield 'decimal' => ['1.5'];
+    }
+
     // ========== Edge Case Tests ==========
 
     public function testNoRecordsToDelete(): void
