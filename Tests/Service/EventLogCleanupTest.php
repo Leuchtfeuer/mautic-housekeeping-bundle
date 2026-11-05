@@ -79,7 +79,7 @@ final class EventLogCleanupTest extends TestCase
     /**
      * @dataProvider pageHitsExcludeEmailsProvider
      */
-    public function testExcludeEmailsOnPageHitsKeepsHitsWithoutEmail(bool $dryRun, string $sql, string $resultMethod, string $message): void
+    public function testExcludeEmailsOnPageHitsStillDeletesHitsWithoutEmail(bool $dryRun, string $sql, string $resultMethod, string $message): void
     {
         $statement = $this->createMock(Result::class);
         $statement->expects($this->once())
