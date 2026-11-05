@@ -45,6 +45,12 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
     | --exclude-emails          | Exclude specific email IDs from event log cleanup. Accepts comma-separated list of email IDs (e.g., 1,44,61). Works with --email-stats and --email-stats-tokens.
 ```
 
+### Config parameters
+Set in `config/local.php`.
+```
+housekeeping_skip_email_stats_tokens | Set to true to stop saving tokens in email_stats (Mautic 5.1+). Sending is not affected, but "view in browser" shows them unfilled and its links do not work. Stats already stored lose their tokens when saved again, for example when the email is opened. Default: false
+```
+
 ### Notice
 - Every last entry from the campaign_lead_event_log per campaign will be kept. This is due to contacts restarting campaigns if there is no last step preserved in the log.
 
