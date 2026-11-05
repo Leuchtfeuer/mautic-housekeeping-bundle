@@ -283,17 +283,18 @@ class EventLogCleanup
     /**
      * Deletes or updates the rows of one operation in batches, each committed on its own.
      * It selects forward by ID, so rows the conditions keep are not read again for every batch.
+     * The write repeats the conditions, so a row that stopped matching after the select stays.
      */
     private function runOperationInBatches(string $operation, int $batchSize, OutputInterface $output): int
     {
         $table     = $this->dbPrefix.(self::EMAIL_STATS_TOKENS === $operation ? self::EMAIL_STATS : $operation);
         $idColumn  = $table.'.id';
-        $template  = str_replace([self::SET, self::PREFIX], ['', $this->dbPrefix], $this->queriesTemplate[$operation]);
-        $selectSql = 'SELECT '.$idColumn.' FROM '.$template.' AND '.$idColumn.' > :lastId ORDER BY '.$idColumn.' LIMIT '.$batchSize;
-        $writeSql  = 'DELETE LOW_PRIORITY FROM '.$table.' WHERE id IN (:batchIds)';
+        $template  = str_replace(self::PREFIX, $this->dbPrefix, $this->queriesTemplate[$operation]);
+        $selectSql = 'SELECT '.$idColumn.' FROM '.str_replace(self::SET, '', $template).' AND '.$idColumn.' > :lastId ORDER BY '.$idColumn.' LIMIT '.$batchSize;
+        $writeSql  = 'DELETE LOW_PRIORITY '.$table.' FROM '.$template.' AND '.$idColumn.' IN (:batchIds)';
 
         if (array_key_exists($operation, $this->update)) {
-            $writeSql = 'UPDATE LOW_PRIORITY '.$table.' '.$this->update[$operation].' WHERE id IN (:batchIds)';
+            $writeSql = 'UPDATE LOW_PRIORITY '.str_replace(self::SET, $this->update[$operation], $template).' AND '.$idColumn.' IN (:batchIds)';
         }
 
         if ($output->isVerbose()) {
@@ -319,8 +320,8 @@ class EventLogCleanup
 
             $affectedRows += $this->connection->executeQuery(
                 $writeSql,
-                ['batchIds' => $ids],
-                ['batchIds' => ArrayParameterType::INTEGER]
+                $this->params[$operation] + ['batchIds' => $ids],
+                $this->types[$operation] + ['batchIds' => ArrayParameterType::INTEGER]
             )->rowCount();
 
             $lastId = max($ids);
