@@ -48,7 +48,7 @@ By default, entries older than 365 days are deleted from the CampaignLeadEventLo
 ### Config parameters
 Set in `config/local.php`.
 ```
-housekeeping_skip_email_stats_tokens | Set to true to stop saving tokens in email_stats (Mautic 5.1+). Sending is not affected, but "view in browser" shows them unfilled and its links do not work. Default: false
+housekeeping_skip_email_stats_tokens | Set to true to stop saving tokens in email_stats (Mautic 5.1+). Sending is not affected, but "view in browser" shows them unfilled and its links do not work. Stats already stored lose their tokens when saved again, for example when the email is opened. Default: false
 ```
 
 ### Notice
