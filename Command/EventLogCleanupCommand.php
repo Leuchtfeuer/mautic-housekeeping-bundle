@@ -43,7 +43,7 @@ class EventLogCleanupCommand extends Command
                     new InputOption('email-stats', 'm', InputOption::VALUE_NONE, 'Purge only Email Stats Records where the referenced email entry is currently not published and purge Email Stats Devices. Important: If referenced email is ever switched back to published, the contacts will get the email again.'),
                     new InputOption('email-stats-tokens', 't', InputOption::VALUE_NONE, 'Set only tokens fields in Email Stats Records to NULL. Important: This option can not be combined with any "-c", "-l" or "-m" flag in one command. And: If the option flag "-t" is not set, the NULL setting of tokens will not be done with the basis command, so if you just run mautic:leuchtfeuer:housekeeping without a flag)'),
                     new InputOption('cmp-id', 'i', InputOption::VALUE_OPTIONAL, 'Delete only campaign_lead_eventLog for a specific CampaignID. Implies --campaign-lead.', 'none'),
-                    new InputOption('exclude-emails', null, InputOption::VALUE_REQUIRED, 'Comma-separated list of email IDs to exclude from deletion (e.g., 1,44,61). Works with --email-stats and --email-stats-tokens.'),
+                    new InputOption('exclude-emails', null, InputOption::VALUE_REQUIRED, 'Comma-separated list of email IDs to exclude from deletion (e.g., 1,44,61). Works with --email-stats, --email-stats-tokens and --page-hits.'),
                     new InputOption('optimize-tables', 'o', InputOption::VALUE_NONE, 'Optimize all database tables. If no cleanup flag is set, only the optimization runs and no data is deleted.'),
                 ]
             )
@@ -82,6 +82,9 @@ class EventLogCleanupCommand extends Command
 
                 Exclude specific emails from cleanup:
                 <info>php %command.full_name% --email-stats --exclude-emails=1,44,61</info>
+
+                Keep the page_hits records of specific emails, such as clicks that a segment still reads:
+                <info>php %command.full_name% --page-hits --exclude-emails=1,44,61</info>
                 EOT
             );
     }

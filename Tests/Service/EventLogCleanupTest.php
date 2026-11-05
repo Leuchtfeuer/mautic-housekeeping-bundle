@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MauticPlugin\LeuchtfeuerHousekeepingBundle\Tests\Service;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
 use MauticPlugin\LeuchtfeuerHousekeepingBundle\Integration\Config;
@@ -73,6 +74,55 @@ final class EventLogCleanupTest extends TestCase
 
         $eventLogCleanup = new EventLogCleanup($connection, 'prefix_table_', $config, $logger);
         $this->assertSame($message, $eventLogCleanup->deleteEventLogEntries(4, $campaignId, $dryRun, $operations, $output));
+    }
+
+    /**
+     * @dataProvider pageHitsExcludeEmailsProvider
+     */
+    public function testExcludeEmailsOnPageHitsStillDeletesHitsWithoutEmail(bool $dryRun, string $sql, string $resultMethod, string $message): void
+    {
+        $statement = $this->createMock(Result::class);
+        $statement->expects($this->once())
+            ->method($resultMethod)
+            ->willReturn(5);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())
+            ->method('executeQuery')
+            ->with(
+                $sql,
+                ['daysOld' => 4, 'excludeEmailIds' => [1, 44]],
+                ['daysOld' => \PDO::PARAM_INT, 'excludeEmailIds' => ArrayParameterType::INTEGER]
+            )
+            ->willReturn($statement);
+
+        $config = $this->createMock(Config::class);
+        $config->method('isPublished')
+            ->willReturn(true);
+
+        $eventLogCleanup = new EventLogCleanup($connection, 'prefix_table_', $config, $this->createStub(\Psr\Log\LoggerInterface::class));
+
+        $this->assertSame(
+            $message,
+            $eventLogCleanup->deleteEventLogEntries(4, null, $dryRun, [EventLogCleanup::PAGE_HITS => true], $this->createStub(OutputInterface::class), [1, 44])
+        );
+    }
+
+    public static function pageHitsExcludeEmailsProvider(): \Generator
+    {
+        yield 'dry run' => [
+            true,
+            'SELECT COUNT(1) as cnt FROM prefix_table_page_hits WHERE date_hit < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND (prefix_table_page_hits.email_id IS NULL OR prefix_table_page_hits.email_id NOT IN (:excludeEmailIds))',
+            'fetchOne',
+            '5 page_hits rows would have been deleted. This is a dry run.',
+        ];
+
+        yield 'real run' => [
+            false,
+            'DELETE LOW_PRIORITY prefix_table_page_hits FROM prefix_table_page_hits WHERE date_hit < DATE_SUB(NOW(),INTERVAL :daysOld DAY) AND (prefix_table_page_hits.email_id IS NULL OR prefix_table_page_hits.email_id NOT IN (:excludeEmailIds))',
+            'rowCount',
+            '5 page_hits rows have been deleted.',
+        ];
     }
 
     public static function runProvider(): \Generator

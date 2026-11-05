@@ -799,6 +799,91 @@ final class EventLogCleanupCommandTest extends MauticMysqlTestCase
         $this->assertStringContainsString('email_stats_devices', $output);
     }
 
+    public function testExcludeEmailsPreservesPageHitsForSpecificEmails(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('exclude-hits@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        $excludedEmail = $this->fixtureHelper->createEmail('Excluded Hits Email', true);
+        $otherEmail    = $this->fixtureHelper->createEmail('Other Hits Email', true);
+
+        $excludedHit = $this->fixtureHelper->createPageHit($contact, $oldDate, $excludedEmail);
+        $recentHit   = $this->fixtureHelper->createPageHit($contact, $this->fixtureHelper->daysAgo(10), $otherEmail);
+        $this->fixtureHelper->createPageHit($contact, $oldDate, $otherEmail);
+        $this->fixtureHelper->createPageHit($contact, $oldDate);
+
+        $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'       => 30,
+            '--page-hits'      => true,
+            '--exclude-emails' => (string) $excludedEmail->getId(),
+        ]);
+
+        $this->em->clear();
+
+        $hits = $this->em->getRepository(Hit::class)->findBy(['lead' => $contact->getId()]);
+        $this->assertCount(2, $hits);
+
+        $hitIds = array_map(static fn (Hit $hit): int => (int) $hit->getId(), $hits);
+        $this->assertContains((int) $excludedHit->getId(), $hitIds);
+        $this->assertContains((int) $recentHit->getId(), $hitIds);
+    }
+
+    public function testExcludeEmailsPreservesPageHitsInDefaultCleanup(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('exclude-hits-default@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        $excludedEmail = $this->fixtureHelper->createEmail('Excluded Default Hits Email', true);
+
+        $excludedHit = $this->fixtureHelper->createPageHit($contact, $oldDate, $excludedEmail);
+        $this->fixtureHelper->createPageHit($contact, $oldDate);
+
+        $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--exclude-emails' => (string) $excludedEmail->getId(),
+        ]);
+
+        $this->em->clear();
+
+        $hits = $this->em->getRepository(Hit::class)->findBy(['lead' => $contact->getId()]);
+        $this->assertCount(1, $hits);
+        $this->assertEquals($excludedHit->getId(), $hits[0]->getId());
+    }
+
+    public function testExcludeEmailsPageHitsDryRunShowsCorrectCounts(): void
+    {
+        $this->fixtureHelper->enablePlugin();
+
+        $contact = $this->fixtureHelper->createContact('exclude-hits-dryrun@test.com');
+        $oldDate = $this->fixtureHelper->daysAgo(400);
+
+        $excludedEmail = $this->fixtureHelper->createEmail('Excluded Dry Run Hits Email', true);
+        $otherEmail    = $this->fixtureHelper->createEmail('Other Dry Run Hits Email', true);
+
+        $this->fixtureHelper->createPageHit($contact, $oldDate, $excludedEmail);
+        $this->fixtureHelper->createPageHit($contact, $oldDate, $otherEmail);
+        $this->fixtureHelper->createPageHit($contact, $oldDate);
+
+        $commandTester = $this->testSymfonyCommand('leuchtfeuer:housekeeping', [
+            '--days-old'       => 30,
+            '--page-hits'      => true,
+            '--dry-run'        => true,
+            '--exclude-emails' => (string) $excludedEmail->getId(),
+        ]);
+
+        $this->em->clear();
+
+        $this->assertCount(3, $this->em->getRepository(Hit::class)->findBy(['lead' => $contact->getId()]));
+
+        $output = $commandTester->getDisplay();
+        $this->assertStringContainsString('2 page_hits', $output);
+        $this->assertStringContainsString('would have been deleted', $output);
+        $this->assertStringContainsString('This is a dry run', $output);
+    }
+
     public function testExcludeEmailsAcceptsMultipleIds(): void
     {
         $this->fixtureHelper->enablePlugin();
